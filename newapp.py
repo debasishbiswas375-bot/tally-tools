@@ -162,4 +162,4 @@ with tabs[3]: # ACCOUNT
             st.rerun()
 
 # --- 5. FOOTER ---
-st.markdown('<div class="footer"><p>Sponsored By <img src="logo1.png"> <b>Uday Mondal</b> | Powered by <b>Debasish Biswas</b></p></div>', unsafe_allow_html=True)
+st.markdown('<div class="footer"><p>Sponsored By <img src="logo 1.png"> <b>Uday Mondal</b> | Powered by <b>Debasish Biswas</b></p></div>', unsafe_allow_html=True)
