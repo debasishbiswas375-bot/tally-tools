@@ -4,7 +4,6 @@ from bs4 import BeautifulSoup
 import pdfplumber
 import base64
 import io
-from PIL import Image
 
 # --- 1. PAGE CONFIGURATION ---
 st.set_page_config(
@@ -14,7 +13,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- 2. SESSION STATE ---
+# --- 2. SESSION STATE (FIXED) ---
 if 'users_db' not in st.session_state:
     st.session_state.users_db = pd.DataFrame([
         {"Username": "admin", "Password": "123", "Role": "Admin", "Pic": None},
@@ -27,14 +26,14 @@ if 'logged_in' not in st.session_state:
     st.session_state.user_role = None
     st.session_state.show_settings = False
 
-# --- 3. CSS: PROFILE NAV STYLE & BLACK INTERNAL TEXT ---
+# --- 3. CSS: PROFILE NAV & BLACK INTERNAL TEXT ---
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
         
         .stApp { background-color: #0056D2; }
 
-        /* --- NAVIGATION TABS (PROFILE STYLE) --- */
+        /* --- NAVIGATION BAR (PROFILE STYLE) --- */
         .stTabs {
             background-color: #0056D2;
             padding-top: 10px;
@@ -46,7 +45,6 @@ st.markdown("""
         .stTabs [data-baseweb="tab"] { 
             color: #FFFFFF !important; 
             font-weight: 600; 
-            font-size: 1rem;
             border-bottom: none !important;
         }
         
@@ -56,25 +54,23 @@ st.markdown("""
             border-radius: 8px 8px 0 0; 
         }
 
-        /* --- VISIBILITY: BLACK TEXT FOR FILE UPLOADER & INPUTS --- */
-        /* Targets 'Drag and drop file here' text inside the white box */
+        /* --- VISIBILITY: BLACK TEXT FOR INTERNAL ELEMENTS --- */
+        /* Targets 'Drag and drop file here' text inside white boxes */
         [data-testid="stFileUploader"] section div div {
             color: #000000 !important;
+            font-weight: 500 !important;
         }
         
-        /* Text inside selectboxes and text inputs */
+        /* Selectbox and Input text colors */
         input, .stTextInput input, .stSelectbox div {
             color: #000000 !important;
             font-weight: 500 !important;
         }
         
-        /* Placeholder visibility */
-        ::placeholder { color: #555555 !important; }
-
         label { color: #FFFFFF !important; font-weight: 600 !important; }
         h1, h2, h3, p, span, .stMarkdown { color: #FFFFFF !important; }
 
-        /* PINNED FOOTER */
+        /* FOOTER */
         .footer {
             position: fixed; left: 0; bottom: 0; width: 100%;
             background-color: #FFFFFF; text-align: center;
@@ -88,7 +84,6 @@ st.markdown("""
             color: #0056D2 !important;
             border-radius: 50px !important;
             font-weight: 700 !important;
-            border: none !important;
         }
 
         header {visibility: hidden;}
@@ -97,7 +92,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 4. LOGIC FUNCTIONS ---
+# --- 4. LOGIC ---
 def get_ledger_names(html_file):
     try:
         soup = BeautifulSoup(html_file, 'html.parser')
@@ -110,7 +105,7 @@ tabs = st.tabs(["Home", "Solutions", "Pricing", "Login", "Register"])
 
 with tabs[0]: # HOME
     if st.session_state.logged_in:
-        # Profile Style Header Integration
+        # Profile Style Header
         p_col1, p_col2 = st.columns([12, 1.5])
         with p_col2:
             if st.button("👤 Profile"):
@@ -122,7 +117,7 @@ with tabs[0]: # HOME
             new_pass = st.text_input("Change Password", type="password")
             if st.button("Save Profile"):
                 idx = st.session_state.users_db[st.session_state.users_db['Username'] == st.session_state.current_user].index[0]
-                # Fixed syntax error for line 149
+                # FIX FOR LINE 149 SYNTAX ERROR
                 if new_pass:
                     st.session_state.users_db.at[idx, 'Password'] = new_pass
                 st.success("Profile Updated!")
@@ -134,26 +129,24 @@ with tabs[0]: # HOME
         else:
             st.markdown(f"<h1>Welcome back, {st.session_state.current_user}!</h1>", unsafe_allow_html=True)
             if st.session_state.user_role == "Admin":
-                st.markdown("### 🛠️ Converter Tool (Full Access)")
-                c1, c2 = st.columns(2, gap="large")
-                with c1:
+                col1, col2 = st.columns(2, gap="large")
+                with col1:
                     with st.container(border=True):
-                        st.markdown("#### 1. Configuration")
-                        # BANK SELECTION (RESTORED)
-                        bank_choice = st.selectbox("Select Bank Format", ["SBI", "HDFC", "ICICI", "Other"])
+                        st.markdown("### 1. Configuration")
+                        st.selectbox("Select Bank Format", ["SBI", "HDFC", "ICICI", "Other"])
                         up_html = st.file_uploader("Upload Master (master.html)", type=['html'])
                         ledgers = get_ledger_names(up_html) if up_html else ["Cash", "Bank"]
                         st.selectbox("Select Bank Ledger", ledgers)
-                with c2:
+                with col2:
                     with st.container(border=True):
-                        st.markdown("#### 2. Process File")
+                        st.markdown("### 2. Process File")
                         st.file_uploader("Bank Statement (Excel/PDF)", type=['pdf', 'xlsx'])
                         st.button("🚀 Process & Generate XML")
             else:
                 st.warning("⚠️ Trial Mode: Please contact Admin for Full Access.")
     else:
         st.markdown('<h1>Perfecting the Science of Data Extraction</h1>', unsafe_allow_html=True)
-        st.info("👋 Use the Login or Register tabs to begin.")
+        st.info("👋 Use the Login tab to begin.")
 
 with tabs[3]: # LOGIN
     st.markdown("## 🔐 Sign In")
@@ -169,7 +162,7 @@ with tabs[3]: # LOGIN
             st.rerun()
         else: st.error("Invalid credentials.")
 
-# --- 6. PINNED GLOBAL FOOTER ---
+# --- 6. FOOTER ---
 st.markdown(f"""
     <div class="footer">
         <p>Sponsored By <b>Uday Mondal</b> | Powered & Created by <b>Debasish Biswas</b></p>
