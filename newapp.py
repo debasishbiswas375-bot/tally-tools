@@ -1,9 +1,7 @@
 import streamlit as st
 import pandas as pd
-from PIL import Image
 from bs4 import BeautifulSoup
 import pdfplumber
-import io
 import base64
 
 # --- 1. PAGE CONFIGURATION ---
@@ -14,47 +12,37 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- 2. SESSION STATE (DATABASE & LOGIN) ---
-if 'users_db' not in st.session_state:
-    st.session_state.users_db = pd.DataFrame([
-        {"Username": "admin", "Password": "123", "Role": "Admin", "Status": "Active"},
-        {"Username": "uday", "Password": "123", "Role": "User", "Status": "Active"}
-    ])
-
-if 'logged_in' not in st.session_state:
-    st.session_state.logged_in = False
-    st.session_state.current_user = None
-
-# --- 3. CAELUM-STYLE CSS (BLUE HEADER / WHITE BODY) ---
+# --- 2. CLEAN LIGHT THEME CSS ---
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
         
         html, body, [class*="css"] {
             font-family: 'Inter', sans-serif;
-            background-color: #FFFFFF; 
-            color: #0F172A;
+            background-color: #FFFFFF; /* Pure White Background */
+            color: #0F172A; /* Dark Slate Text */
         }
 
-        /* --- NAVBAR --- */
+        /* --- NAVBAR STYLING --- */
         .stTabs {
-            background-color: #0044CC; /* Caelum Blue */
+            background-color: #0044CC; /* Caelum Blue Navbar Strip */
             padding-top: 10px;
-            padding-bottom: 20px;
+            padding-bottom: 0px;
             margin-top: -6rem; 
             position: sticky;
             top: 0;
             z-index: 999;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
         }
 
         .stTabs [data-baseweb="tab-list"] {
-            gap: 25px;
+            gap: 30px;
             justify-content: flex-end;
             padding-right: 50px;
         }
 
         .stTabs [data-baseweb="tab"] {
-            height: 50px;
+            height: 60px;
             white-space: pre-wrap;
             background-color: transparent;
             border: none;
@@ -63,58 +51,56 @@ st.markdown("""
             font-size: 1rem;
         }
 
-        .stTabs [data-baseweb="tab"]:hover { color: #FFFFFF; }
+        .stTabs [data-baseweb="tab"]:hover {
+            color: #FFFFFF;
+        }
 
         .stTabs [aria-selected="true"] {
-            background-color: #003399 !important; /* Slightly darker active tab */
+            background-color: transparent !important;
             color: #FFFFFF !important;
-            border-radius: 50px;
-            padding: 0 20px;
+            border-bottom: 4px solid #4ADE80; /* Green Active Indicator */
+            font-weight: 700;
         }
 
-        /* --- HERO HEADER (BLUE) --- */
-        .hero-container {
-            background-color: #0044CC; /* Match Navbar */
-            padding: 40px 80px 80px 80px;
-            margin: -20px -4rem 40px -4rem; /* Extend full width */
-            text-align: left;
-            border-bottom: 10px solid #F1F5F9; /* Slight separation */
+        /* --- HERO SECTION (LIGHT THEME) --- */
+        .hero-section {
+            background-color: #F8FAFC; /* Very Light Grey */
+            padding: 60px 80px 60px 80px;
+            margin: 0 -4rem 30px -4rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            border-bottom: 1px solid #E2E8F0;
         }
         
+        /* Dark Blue Title */
         .hero-title { 
-            font-size: 3rem; 
+            font-size: 3.5rem; 
             font-weight: 800; 
-            color: #FFFFFF !important;
-            margin-bottom: 15px;
+            line-height: 1.1; 
+            margin-bottom: 20px; 
+            color: #0044CC !important; 
         }
         
+        /* Grey Subtitle */
         .hero-subtitle { 
             font-size: 1.2rem; 
-            color: #E0E7FF !important; 
+            color: #475569 !important; 
+            margin-bottom: 30px; 
             max-width: 600px; 
-            line-height: 1.5;
+            line-height: 1.6;
         }
-
-        /* --- MAIN CONTENT AREA (WHITE) --- */
-        /* Card Styling for Login/Register Box */
-        .auth-card {
-            background-color: white;
-            padding: 30px;
-            border: 1px solid #E2E8F0;
-            border-radius: 8px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
-        }
-
-        /* Streamlit Container override */
+        
+        /* CARD STYLING */
         .stContainer {
             background-color: white;
+            padding: 30px;
+            border-radius: 12px;
+            box-shadow: 0 4px 15px -3px rgba(0,0,0,0.05);
             border: 1px solid #E2E8F0;
-            border-radius: 8px;
-            padding: 20px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
         }
-
-        /* Buttons (Green Action) */
+        
+        /* Buttons */
         div[data-testid="stButton"] button {
              background-color: #4ADE80; /* Caelum Green */
              color: #0044CC; 
@@ -122,16 +108,18 @@ st.markdown("""
              border-radius: 50px;
              border: none;
              padding: 10px 25px;
-             width: 100%;
+             transition: all 0.3s ease;
         }
         div[data-testid="stButton"] button:hover {
              background-color: #22c55e;
              color: white;
+             transform: translateY(-2px);
+             box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
         }
 
         /* Footer */
         .footer {
-            margin-top: 80px; padding: 40px; text-align: center; 
+            margin-top: 60px; padding: 40px; text-align: center; 
             color: #64748B; border-top: 1px solid #E2E8F0;
             background-color: #F8FAFC; margin-bottom: -60px;
         }
@@ -140,7 +128,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 4. LOGIC FUNCTIONS ---
+# --- 3. LOGIC FUNCTIONS ---
 def get_img_as_base64(file):
     try:
         with open(file, "rb") as f: data = f.read()
@@ -289,135 +277,77 @@ def generate_tally_xml(df, bank_ledger_name, default_party_ledger):
         </TALLYMESSAGE>"""
     return xml_header + xml_body + xml_footer
 
-# --- 5. NAVIGATION ---
-tabs = st.tabs(["Home", "Solutions", "Pricing", "User Management"])
+# --- 4. TOP NAVIGATION BAR ---
+tabs = st.tabs(["Home", "Solutions", "Pricing"])
 
 # --- TAB 1: HOME ---
 with tabs[0]:
-    # BLUE HERO SECTION
-    st.markdown("""
-        <div class="hero-container">
-            <div class="hero-title">Perfecting the Science of Data Extraction</div>
-            <div class="hero-subtitle">
-                AI-powered tool to convert bank statements and financial documents into Tally XML with 99% accuracy. 
-                Supports Excel & PDF formats.
+    # LIGHT THEME HERO SECTION
+    # Using 'logo.png' for the hero illustration
+    try: hero_logo_b64 = get_img_as_base64("logo.png")
+    except: hero_logo_b64 = None
+    hero_img_html = f'<img src="data:image/png;base64,{hero_logo_b64}" style="max-width: 100%; animation: float 6s ease-in-out infinite;">' if hero_logo_b64 else ""
+
+    st.markdown(f"""
+        <div class="hero-section">
+            <div class="hero-content">
+                <div class="hero-title">Perfecting the Science of Data Extraction</div>
+                <div class="hero-subtitle">
+                    AI-powered tool to convert bank statements, financial documents into Tally XML with 99% accuracy. 
+                    Supports Excel & PDF formats.
+                </div>
             </div>
+            <div style="width: 250px;">{hero_img_html}</div>
         </div>
     """, unsafe_allow_html=True)
 
-    if st.session_state.logged_in:
-        # LOGGED IN: SHOW DASHBOARD
-        st.markdown("### 🚀 Dashboard")
-        
-        col_left, col_right = st.columns([1, 1.5], gap="large")
-        
-        with col_left:
-            with st.container():
-                st.markdown("#### 🛠️ Settings & Mapping")
-                uploaded_html = st.file_uploader("Upload Tally Master (Optional)", type=['html', 'htm'])
-                
-                ledger_list = ["Suspense A/c", "Cash", "Bank"]
-                if uploaded_html:
-                    extracted = get_ledger_names(uploaded_html)
-                    if extracted:
-                        ledger_list = extracted
-                        st.success(f"✅ Synced {len(ledger_list)} ledgers")
-                
-                bank_ledger = st.selectbox("Select Bank Ledger", ledger_list, index=0)
-                party_ledger = st.selectbox("Select Default Party", ledger_list, index=0)
-
-        with col_right:
-            with st.container():
-                st.markdown("#### 📂 Upload & Convert")
-                c1, c2 = st.columns([1.5, 1])
-                with c1: bank_choice = st.selectbox("Bank Format", ["SBI", "PNB", "ICICI", "Axis Bank", "HDFC Bank", "Kotak Mahindra", "Yes Bank", "Indian Bank", "India Post (IPPB)", "RBL Bank", "Other"])
-                with c2: pdf_pass = st.text_input("PDF Password", type="password", placeholder="(Optional)")
-
-                uploaded_file = st.file_uploader("Upload Statement (Excel or PDF)", type=['xlsx', 'xls', 'pdf'])
-                
-                if uploaded_file:
-                    with st.spinner("Processing..."):
-                        df_raw = load_bank_file(uploaded_file, pdf_pass)
-                    
-                    if df_raw is not None:
-                        df_clean = normalize_bank_data(df_raw, bank_choice)
-                        st.dataframe(df_clean.head(3), use_container_width=True, hide_index=True)
-                        st.write("")
-                        if st.button("🚀 Convert to Tally XML"):
-                            xml_data = generate_tally_xml(df_clean, bank_ledger, party_ledger)
-                            st.balloons()
-                            st.success("Conversion Successful!")
-                            st.download_button("Download XML File", xml_data, "tally_import.xml", "application/xml")
-                    else:
-                        st.error("⚠️ Error: Could not read file. Check format or password.")
-
-    else:
-        # NOT LOGGED IN: SHOW LANDING PAGE (Image Left, Login Right)
-        col1, col2 = st.columns([1.5, 1], gap="large")
-        
-        with col1:
-            try: hero_logo_b64 = get_img_as_base64("logo.png")
-            except: hero_logo_b64 = None
-            hero_img_html = f'<img src="data:image/png;base64,{hero_logo_b64}" style="width: 80%; display:block; margin:auto;">' if hero_logo_b64 else ""
-            st.markdown(f"{hero_img_html}", unsafe_allow_html=True)
+    # --- MAIN TOOL AREA (OPEN TO ALL) ---
+    col_left, col_right = st.columns([1, 1.5], gap="large")
+    
+    with col_left:
+        with st.container():
+            st.markdown("### 🛠️ 1. Settings & Mapping")
             
-            st.markdown("""
-            <div style="margin-top:20px; color:#475569;">
-                <h3>Why Choose Accounting Expert?</h3>
-                <ul>
-                    <li><strong>99% Accuracy:</strong> AI-powered extraction.</li>
-                    <li><strong>Secure:</strong> Data processed locally.</li>
-                    <li><strong>Universal:</strong> Supports most Indian banks.</li>
-                </ul>
-            </div>
-            """, unsafe_allow_html=True)
-
-        with col2:
-            st.markdown('<div class="auth-card">', unsafe_allow_html=True)
-            auth_mode = st.radio("Access Tool:", ["Register for Free Trial", "Login"], horizontal=True)
-            st.write("")
+            uploaded_html = st.file_uploader("Upload Tally Master (Optional)", type=['html', 'htm'], help="Upload 'List of Accounts.html' exported from Tally.")
             
-            if auth_mode == "Login":
-                u = st.text_input("Username", key="login_u")
-                p = st.text_input("Password", type="password", key="login_p")
-                if st.button("Sign In"):
-                    user = st.session_state.users_db[(st.session_state.users_db['Username'] == u) & (st.session_state.users_db['Password'] == p)]
-                    if not user.empty:
-                        st.session_state.logged_in = True
-                        st.session_state.current_user = u
-                        st.rerun()
-                    else: st.error("Incorrect credentials.")
-            else:
-                new_u = st.text_input("Create Username", key="reg_u")
-                new_p = st.text_input("Create Password", type="password", key="reg_p")
-                if st.button("Start Free Trial"):
-                    if new_u and new_p:
-                        if new_u in st.session_state.users_db['Username'].values:
-                            st.error("User exists.")
-                        else:
-                            new_entry = pd.DataFrame([{"Username": new_u, "Password": new_p, "Role": "User", "Status": "Active"}])
-                            st.session_state.users_db = pd.concat([st.session_state.users_db, new_entry], ignore_index=True)
-                            st.success("Created! Please Login.")
-                    else: st.warning("Fill all details.")
-            st.markdown('</div>', unsafe_allow_html=True)
+            ledger_list = ["Suspense A/c", "Cash", "Bank"]
+            if uploaded_html:
+                extracted = get_ledger_names(uploaded_html)
+                if extracted:
+                    ledger_list = extracted
+                    st.success(f"✅ Synced {len(ledger_list)} ledgers")
+            
+            bank_ledger = st.selectbox("Select Bank Ledger", ledger_list, index=0)
+            party_ledger = st.selectbox("Select Default Party", ledger_list, index=0)
+
+    with col_right:
+        with st.container():
+            st.markdown("### 📂 2. Upload & Convert")
+            c1, c2 = st.columns([1.5, 1])
+            with c1: bank_choice = st.selectbox("Bank Format", ["SBI", "PNB", "ICICI", "Axis Bank", "HDFC Bank", "Kotak Mahindra", "Yes Bank", "Indian Bank", "India Post (IPPB)", "RBL Bank", "Other"])
+            with c2: pdf_pass = st.text_input("PDF Password", type="password", placeholder="(Optional)")
+
+            uploaded_file = st.file_uploader("Upload Statement (Excel or PDF)", type=['xlsx', 'xls', 'pdf'])
+            
+            if uploaded_file:
+                with st.spinner("Processing..."):
+                    df_raw = load_bank_file(uploaded_file, pdf_pass)
+                
+                if df_raw is not None:
+                    df_clean = normalize_bank_data(df_raw, bank_choice)
+                    st.dataframe(df_clean.head(3), use_container_width=True, hide_index=True)
+                    st.write("")
+                    if st.button("🚀 Convert to Tally XML"):
+                        xml_data = generate_tally_xml(df_clean, bank_ledger, party_ledger)
+                        st.balloons()
+                        st.success("Conversion Successful!")
+                        st.download_button("Download XML File", xml_data, "tally_import.xml", "application/xml")
+                else:
+                    st.error("⚠️ Error: Could not read file. Check format or password.")
 
 # --- TAB 2 & 3: PLACEHOLDERS ---
 with tabs[1]: st.info("Solutions Page - Coming Soon...")
 with tabs[2]: st.info("Pricing Page - Coming Soon...")
-
-# --- TAB 4: USER MANAGEMENT ---
-with tabs[3]:
-    st.markdown("<br>", unsafe_allow_html=True)
-    if st.session_state.logged_in:
-        st.success(f"Logged in as: {st.session_state.current_user}")
-        if st.button("Logout"):
-            st.session_state.logged_in = False
-            st.rerun()
-        st.divider()
-        st.markdown("### 👥 User Database (Admin View)")
-        st.dataframe(st.session_state.users_db, use_container_width=True)
-    else:
-        st.warning("Please Login from the Home Page first.")
 
 # --- FOOTER ---
 try: footer_logo_b64 = get_img_as_base64("logo 1.png")
