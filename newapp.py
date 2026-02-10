@@ -13,9 +13,8 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- 2. SESSION STATE (STABILIZED) ---
+# --- 2. SESSION STATE ---
 if 'users_db' not in st.session_state:
-    # Initializing with the users mentioned in your project
     st.session_state.users_db = pd.DataFrame([
         {"Username": "admin", "Password": "123", "Role": "Admin", "Pic": None},
         {"Username": "uday", "Password": "123", "Role": "Trial", "Pic": None}
@@ -27,7 +26,7 @@ if 'logged_in' not in st.session_state:
     st.session_state.user_role = None
     st.session_state.show_settings = False
 
-# --- 3. CUSTOM CSS ---
+# --- 3. CUSTOM CSS (FIXED CONTRAST & VISIBILITY) ---
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
@@ -45,13 +44,27 @@ st.markdown("""
         .stTabs [data-baseweb="tab"] { color: #FFFFFF !important; font-weight: 600; border: none !important; }
         .stTabs [aria-selected="true"] { background-color: #FFFFFF !important; color: #0056D2 !important; border-radius: 8px 8px 0 0; }
 
-        /* FORCING BLACK TEXT IN INPUTS & UPLOADERS */
+        /* INPUTS & UPLOADERS (FORCING BLACK TEXT) */
         [data-testid="stFileUploader"] * { color: #000000 !important; }
         [data-testid="stFileUploaderDropzone"] div { color: #000000 !important; font-weight: 500 !important; }
         input, .stTextInput input, .stSelectbox div, .stSelectbox span { color: #000000 !important; font-weight: 500 !important; }
 
         label { color: #FFFFFF !important; font-weight: 600 !important; }
         h1, h2, h3, p, span, .stMarkdown { color: #FFFFFF !important; }
+
+        /* PRICING CARDS (HIGH CONTRAST FIX) */
+        .price-card {
+            background-color: #FFFFFF;
+            padding: 25px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            min-height: 220px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        .price-card h4 { color: #0056D2 !important; margin-top: 0; font-weight: 800; }
+        .price-card ul { color: #1E293B !important; list-style-type: none; padding-left: 0; }
+        .price-card li { margin-bottom: 12px; font-weight: 500; font-size: 1.1em; }
+        .price-card b { color: #0056D2; font-size: 1.1em; }
 
         /* PINNED FOOTER */
         .footer {
@@ -67,6 +80,7 @@ st.markdown("""
             color: #0056D2 !important;
             border-radius: 50px !important;
             font-weight: 700 !important;
+            border: none !important;
         }
 
         header {visibility: hidden;}
@@ -89,7 +103,6 @@ tabs = st.tabs(["Home", "Solutions", "Pricing", "Login", "Register"])
 
 with tabs[0]: # HOME
     if st.session_state.logged_in:
-        # Profile/Logout controls
         p_col1, p_col2 = st.columns([12, 1.5])
         with p_col2:
             if st.button("👤 Profile"):
@@ -111,7 +124,6 @@ with tabs[0]: # HOME
                 st.session_state.current_user = None
                 st.rerun()
         else:
-            # Main Converter Tool - Visible after Login
             st.markdown(f"<h1>Welcome back, {st.session_state.current_user}!</h1>", unsafe_allow_html=True)
             if st.session_state.user_role == "Admin":
                 st.markdown("### 🛠️ Converter Tool (Full Access)")
@@ -129,39 +141,63 @@ with tabs[0]: # HOME
                         st.markdown("#### 📂 2. Upload & Convert")
                         st.file_uploader("Drop your Bank Statement here", type=['pdf', 'xlsx'])
                         if st.button("🚀 Process & Generate XML"):
-                            # This acts as the "popup" or status notification
-                            st.success("Conversion Process Started! Please wait...")
+                            st.success("✅ Conversion Process Started! Check logs below.")
             else:
-                st.warning("⚠️ Trial Mode: Please contact Admin for Full Access.")
+                st.warning("⚠️ Trial Mode: Please contact Admin for Full Access to XML Export features.")
     else:
         st.markdown('<h1>Perfecting the Science of Data Extraction</h1>', unsafe_allow_html=True)
-        st.info("👋 Use the **Login** tab to begin or **Register** to create an account.")
+        st.info("👋 Welcome! Please use the **Login** tab to access the tool or **Register** for a trial.")
 
 with tabs[1]: # SOLUTIONS
     st.markdown("## 🚀 Our Solutions")
     st.markdown("""
-    * **Bank Statement Converter:** Convert any PDF/Excel bank statement into Tally-ready XML format.
-    * **Tally Master Integration:** Automatically fetch your Tally ledgers using HTML master files.
-    * **Data Accuracy:** Advanced parsing technology to ensure 100% data integrity.
+    ### 🏦 Bank to Tally XML
+    Convert complex PDF and Excel bank statements into structured Tally XML format in seconds.
+    
+    ### 📋 Ledger Auto-Mapping
+    By uploading your `master.html` from Tally, our system automatically maps your bank entries to your existing ledgers.
+    
+    ### 🛡️ Secure & Offline
+    Your data stays in the browser session. We prioritize the security of your financial information.
     """)
 
 with tabs[2]: # PRICING
     st.markdown("## 💰 Pricing & Plans")
     col_a, col_b = st.columns(2)
+    
     with col_a:
-        st.info("#### Trial Plan\n* Unlimited previews\n* Restricted XML Export\n* **Price: Free**")
+        st.markdown("""
+            <div class="price-card" style="border-left: 10px solid #CBD5E1;">
+                <h4>Trial Plan</h4>
+                <ul>
+                    <li>✅ Unlimited previews</li>
+                    <li>❌ Restricted XML Export</li>
+                    <li>✅ Basic Support</li>
+                    <li><b>Price: Free</b></li>
+                </ul>
+            </div>
+        """, unsafe_allow_html=True)
+
     with col_b:
-        st.success("#### Professional Plan\n* Full XML Generation\n* All Bank Formats supported\n* **Contact Admin for Access**")
+        st.markdown("""
+            <div class="price-card" style="border-left: 10px solid #66E035;">
+                <h4>Professional Plan</h4>
+                <ul>
+                    <li>✅ Full XML Generation</li>
+                    <li>✅ All Bank Formats supported</li>
+                    <li>✅ Priority Admin Support</li>
+                    <li><b>Contact Admin for Access</b></li>
+                </ul>
+            </div>
+        """, unsafe_allow_html=True)
 
 with tabs[3]: # LOGIN
     if st.session_state.logged_in:
         st.success(f"You are already logged in as **{st.session_state.current_user}**.")
-        if st.button("Go to Home"):
-            st.rerun()
     else:
         st.markdown("## 🔐 Sign In")
-        l_u = st.text_input("Username", key="login_user")
-        l_p = st.text_input("Password", type="password", key="login_pass")
+        l_u = st.text_input("Username", key="login_u")
+        l_p = st.text_input("Password", type="password", key="login_p")
         if st.button("Sign In"):
             db = st.session_state.users_db
             user_match = db[(db['Username'] == l_u) & (db['Password'] == l_p)]
@@ -174,17 +210,16 @@ with tabs[3]: # LOGIN
                 st.error("Invalid credentials.")
 
 with tabs[4]: # REGISTER
-    st.markdown("## 📝 Create a New Account")
-    new_u = st.text_input("Choose Username", key="reg_user")
-    new_p = st.text_input("Choose Password", type="password", key="reg_pass")
+    st.markdown("## 📝 Create Account")
+    new_u = st.text_input("Choose Username", key="reg_u")
+    new_p = st.text_input("Choose Password", type="password", key="reg_p")
     if st.button("Register Now"):
         if new_u and new_p:
-            # Add to the session database
             new_row = {"Username": new_u, "Password": new_p, "Role": "Trial", "Pic": None}
             st.session_state.users_db = pd.concat([st.session_state.users_db, pd.DataFrame([new_row])], ignore_index=True)
-            st.success("Registration Successful! You can now log in.")
+            st.success("✅ Registration Successful! Please switch to the **Login** tab to sign in.")
         else:
-            st.error("Please provide both a username and password.")
+            st.error("Please fill in both fields.")
 
 # --- 6. FOOTER ---
 st.markdown(f"""
