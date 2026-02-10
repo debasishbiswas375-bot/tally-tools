@@ -327,7 +327,7 @@ with st.container(border=True):
                 st.error("❌ Error reading file. Ensure it is a valid Statement format.")
 
 # --- FOOTER WITH LOGO ---
-img_b64 = get_img_as_base64("logo.png")
+img_b64 = get_img_as_base64("logo1.png")
 if img_b64:
     logo_html = f'<img src="data:image/png;base64,{img_b64}" width="25" style="vertical-align: middle; margin-right: 5px;">'
 else:
