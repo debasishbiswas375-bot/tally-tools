@@ -14,9 +14,8 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- 2. SESSION STATE ---
+# --- 2. SESSION STATE (FIXED: Includes 'Pic' and 'user_role') ---
 if 'users_db' not in st.session_state:
-    # Initializing with 'Pic' to avoid KeyError
     st.session_state.users_db = pd.DataFrame([
         {"Username": "admin", "Password": "123", "Role": "Admin", "Pic": None},
         {"Username": "uday", "Password": "123", "Role": "Trial", "Pic": None}
@@ -28,7 +27,7 @@ if 'logged_in' not in st.session_state:
     st.session_state.user_role = None
     st.session_state.show_settings = False
 
-# --- 3. REFINED CSS: PROFILE STYLE NAV & BLACK INTERNAL TEXT ---
+# --- 3. REFINED CSS: PROFILE NAV & BLACK INTERNAL TEXT ---
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
@@ -57,19 +56,27 @@ st.markdown("""
             border-radius: 8px 8px 0 0; 
         }
 
-        /* --- VISIBILITY: BLACK TEXT FOR FILE UPLOADER & INPUTS --- */
-        /* Targets 'Drag and drop file here' text inside white upload boxes */
+        /* --- CRITICAL VISIBILITY FIX: BLACK TEXT FOR UPLOADER --- */
+        /* Targets 'Drag and drop file here' and sub-text inside white boxes */
         [data-testid="stFileUploader"] section div div {
             color: #000000 !important;
-            font-weight: 500 !important;
+            font-weight: 600 !important;
         }
         
-        /* Selectbox and Input text colors forced to black for contrast */
+        /* Forces 'Browse files' button text color */
+        [data-testid="stFileUploader"] button p {
+            color: #000000 !important;
+        }
+        
+        /* Forces all dropdown and input text to black for readability */
         input, .stTextInput input, .stSelectbox div {
             color: #000000 !important;
             font-weight: 500 !important;
         }
         
+        /* Placeholder visibility */
+        ::placeholder { color: #555555 !important; opacity: 1; }
+
         label { color: #FFFFFF !important; font-weight: 600 !important; }
         h1, h2, h3, p, span, .stMarkdown { color: #FFFFFF !important; }
 
@@ -81,7 +88,7 @@ st.markdown("""
         }
         .footer p, .footer b { color: #1E293B !important; margin: 0; }
 
-        /* BUTTONS */
+        /* SUCCESS BUTTONS */
         div.stButton > button {
             background-color: #66E035 !important;
             color: #0056D2 !important;
@@ -121,7 +128,7 @@ with tabs[0]: # HOME
             new_pass = st.text_input("Change Password", type="password")
             if st.button("Save Profile"):
                 idx = st.session_state.users_db[st.session_state.users_db['Username'] == st.session_state.current_user].index[0]
-                # Fix for line 149 syntax error
+                # --- FIXED SYNTAX ERROR: Resolved missing parenthesis from image_01d678.png ---
                 if new_pass:
                     st.session_state.users_db.at[idx, 'Password'] = new_pass
                 st.success("Profile Updated!")
@@ -134,21 +141,21 @@ with tabs[0]: # HOME
             st.markdown(f"<h1>Welcome back, {st.session_state.current_user}!</h1>", unsafe_allow_html=True)
             if st.session_state.user_role == "Admin":
                 st.markdown("### 🛠️ Converter Tool (Full Access)")
-                c1, c2 = st.columns(2, gap="large")
-                with c1:
+                col1, col2 = st.columns(2, gap="large")
+                with col1:
                     with st.container(border=True):
                         st.markdown("#### 🛠️ 1. Settings & Mapping")
-                        # Restored bank format and uploader
+                        # Restored bank choice and uploader logic
                         bank_choice = st.selectbox("Select Bank Format", ["SBI", "HDFC", "ICICI", "Other"])
-                        up_html = st.file_uploader("Upload Tally Master (Optional)", type=['html'])
+                        up_html = st.file_uploader("Upload Tally Master (master.html)", type=['html'])
                         ledgers = get_ledger_names(up_html) if up_html else ["Cash", "Bank", "Suspense A/c"]
                         st.selectbox("Select Bank Ledger", ledgers)
                         st.selectbox("Select Default Party", ledgers)
-                with c2:
+                with col2:
                     with st.container(border=True):
                         st.markdown("#### 📂 2. Upload & Convert")
-                        # The text here is now black for visibility
-                        st.file_uploader("Drop your Statement here (Excel or PDF)", type=['pdf', 'xlsx'])
+                        # Visibility for 'Drag and drop' is now forced to black
+                        st.file_uploader("Drop your Bank Statement here", type=['pdf', 'xlsx'])
                         st.button("🚀 Process & Generate XML")
             else:
                 st.warning("⚠️ Trial Mode: Please contact Admin for Full Access.")
@@ -158,8 +165,8 @@ with tabs[0]: # HOME
 
 with tabs[3]: # LOGIN
     st.markdown("## 🔐 Sign In")
-    l_u = st.text_input("Username", key="l_u")
-    l_p = st.text_input("Password", type="password", key="l_p")
+    l_u = st.text_input("Username", key="l_u", placeholder="Enter username")
+    l_p = st.text_input("Password", type="password", key="l_p", placeholder="Enter password")
     if st.button("Sign In"):
         db = st.session_state.users_db
         user_match = db[(db['Username'] == l_u) & (db['Password'] == l_p)]
