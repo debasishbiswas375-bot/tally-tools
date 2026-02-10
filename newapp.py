@@ -12,7 +12,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- 2. IMAGE ENCODING (Base64 for Local Logos) ---
+# --- 2. IMAGE ENCODING (Base64) ---
 def get_base64_image(image_path):
     if os.path.exists(image_path):
         with open(image_path, "rb") as img_file:
@@ -22,35 +22,25 @@ def get_base64_image(image_path):
 logo_main_b64 = get_base64_image("logo.png")
 logo_uday_b64 = get_base64_image("logo 1.png")
 
-# --- 3. PERSISTENT DATABASE LOGIC ---
+# --- 3. PERSISTENT DATABASE ---
 DB_FILE = "users.csv"
-
 def load_data():
     if os.path.exists(DB_FILE):
         return pd.read_csv(DB_FILE)
-    return pd.DataFrame([{
-        "Username": "admin", "Password": "123", "Role": "Admin", 
-        "Status": "Paid", "Name": "Admin User", "Mobile": "000", "Email": "admin@test.com"
-    }])
+    return pd.DataFrame([{"Username": "admin", "Password": "123", "Role": "Admin", "Status": "Paid", "Name": "Admin User"}])
 
 if 'users_db' not in st.session_state:
     st.session_state.users_db = load_data()
 
-if 'logged_in' not in st.session_state:
-    st.session_state.logged_in = False
-    st.session_state.current_user = None
-    st.session_state.user_role = None
-    st.session_state.user_status = None
-
-# --- 4. CSS (LOGO PLACEMENT & WHITE TEXT) ---
+# --- 4. CSS (RECTIFIED LOGO, WHITE TEXT & FOOTER) ---
 st.markdown(f"""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
-        .stApp {{ background-color: #0056D2; }}
+        .stApp {{ background-color: #0056D2; padding-bottom: 100px; }}
 
-        /* LOGO: UPPER LEFT CORNER */
+        /* LOGO: UPPER LEFT CORNER ADJUSTED */
         .top-left-logo {{
-            position: fixed; left: 30px; top: 10px; width: 125px; z-index: 10001;
+            position: fixed; left: 30px; top: 15px; width: 125px; z-index: 10001;
         }}
 
         /* FORCE ALL TEXTS TO WHITE */
@@ -86,13 +76,16 @@ st.markdown(f"""
 
         header {{visibility: hidden;}}
 
-        /* FOOTER */
+        /* RECTIFIED FOOTER: ENSURING BOTH LINES SHOW */
         .footer-container {{
             position: fixed; left: 0; bottom: 0; width: 100%;
-            background-color: #FFFFFF; text-align: center; padding: 12px 0; z-index: 2000;
+            background-color: #FFFFFF; text-align: center; 
+            padding: 15px 0 20px 0; z-index: 2000;
+            border-top: 1px solid #E2E8F0;
         }}
-        .footer-line1 {{ display: flex; align-items: center; justify-content: center; font-size: 16px; color: #64748B !important; margin-bottom: 3px; }}
-        .footer-logo {{ height: 22px; margin: 0 8px; vertical-align: middle; }}
+        .footer-line1 {{ display: flex; align-items: center; justify-content: center; font-size: 16px; color: #64748B !important; margin-bottom: 6px; }}
+        .footer-line2 {{ display: block; font-size: 14px; color: #94A3B8 !important; }}
+        .footer-logo {{ height: 24px; margin: 0 10px; vertical-align: middle; }}
         .name-highlight {{ color: #0F172A !important; font-weight: 800; }}
         .dev-highlight {{ color: #00A389 !important; font-weight: 700; }}
     </style>
@@ -102,11 +95,7 @@ st.markdown(f"""
 if logo_main_b64:
     st.markdown(f'<img src="data:image/png;base64,{logo_main_b64}" class="top-left-logo">', unsafe_allow_html=True)
 
-# --- 6. NAVIGATION & REDIRECT LOGIC ---
-# We use session state to force tab selection after login
-if 'active_tab' not in st.session_state:
-    st.session_state.active_tab = 0 # Default to Home
-
+# --- 6. NAVIGATION ---
 tabs = st.tabs(["Home", "Solutions", "Pricing", "Account"])
 
 with tabs[0]: # HOME
@@ -119,67 +108,66 @@ with tabs[0]: # HOME
                 with st.container(border=True):
                     st.markdown("#### 🛠️ 1. Settings & Mapping")
                     st.file_uploader("Upload Tally Master (master.html)", type=['html'], key="h_m")
-                    # RE-INTEGRATED LEDGER OPTIONS
-                    st.selectbox("Select Bank Ledger (1st Ledger)", ["Cash", "HDFC Bank", "SBI Bank", "ICICI Bank"], key="sel_l1")
-                    st.selectbox("Select Party Ledger (2nd Ledger)", ["Cash", "Suspense Account", "General Expense"], key="sel_l2")
+                    st.selectbox("Select Bank Ledger (1st Ledger)", ["Cash", "HDFC Bank", "SBI Bank"], key="l1")
+                    st.selectbox("Select Party Ledger (2nd Ledger)", ["Suspense Account", "Sales"], key="l2")
             with col2:
                 with st.container(border=True):
                     st.markdown("#### 📂 2. Upload & Convert")
-                    st.selectbox("Select Indian Bank Format", ["SBI", "HDFC", "ICICI", "Axis", "PNB", "BOB"], key="h_f")
+                    st.selectbox("Select Indian Bank Format", ["SBI", "HDFC", "ICICI", "Axis", "PNB", "BOB", "IDFC", "Canara"], key="h_f")
                     st.file_uploader("Drop Bank Statement (PDF/XLSX)", type=['pdf', 'xlsx'], key="h_s")
                     st.button("🚀 Process & Generate XML")
         else:
-            st.warning("⚠️ Trial Mode: Please upgrade to a Paid account to unlock full features.")
+            st.warning("⚠️ Trial Mode: Please upgrade to a Paid account.")
     else:
         st.markdown('<h1>Perfecting the Science of Data Extraction</h1>', unsafe_allow_html=True)
-        st.info("👋 Use the **Account** tab to Sign In.")
+        st.info("👋 Use the Account tab to Sign In.")
 
 with tabs[1]: # SOLUTIONS
-    st.markdown("## 🚀 Our Solutions")
-    st.markdown('<div class="content-card"><h4>🏦 All Indian Banks Supported</h4><p>Automated XML mapping for SBI, HDFC, ICICI, Axis, PNB, and more.</p></div>', unsafe_allow_html=True)
+    st.markdown("## 🚀 Our Core Solutions")
+    st.markdown("""
+        <div class="content-card">
+            <h4>🏦 All Indian Banks Statement Mapping</h4>
+            <p>We provide specialized mapping for all major Indian banks including SBI, HDFC, ICICI, PNB, and Axis. Simply select your bank format, and our engine handles the complex parsing instantly.</p>
+        </div>
+        <div class="content-card">
+            <h4>📊 Tally XML Automation</h4>
+            <p>Automatically generate Tally Prime compatible XML files. No more manual data entry or accounting errors.</p>
+        </div>
+    """, unsafe_allow_html=True)
 
 with tabs[2]: # PRICING
-    st.markdown("## 💰 Pricing Plans")
-    p1, p2 = st.columns(2)
-    with p1: st.markdown('<div class="content-card"><h4>Free Plan</h4><b>Price: ₹0</b></div>', unsafe_allow_html=True)
-    with p2: st.markdown('<div class="content-card"><h4>Paid Plan</h4><b>Contact Admin</b></div>', unsafe_allow_html=True)
+    st.markdown("## 💰 Professional Pricing")
+    st.markdown('<div class="content-card"><h4>Professional Plan</h4><p>Unlock all Indian bank formats and unlimited XML exports.</p><b>Contact Admin for Paid Access</b></div>', unsafe_allow_html=True)
 
 with tabs[3]: # ACCOUNT
     if not st.session_state.get('logged_in', False):
-        mode = st.radio("Choose Action", ["Login", "Register"], horizontal=True)
+        mode = st.radio("Action", ["Login", "Register"], horizontal=True)
         if mode == "Login":
-            u_in = st.text_input("Username", key="l_u")
-            p_in = st.text_input("Password", type="password", key="l_p")
+            u = st.text_input("Username", key="login_u")
+            p = st.text_input("Password", type="password", key="login_p")
             if st.button("Sign In"):
                 db = st.session_state.users_db
-                match = db[(db['Username'] == u_in) & (db['Password'] == p_in)]
+                match = db[(db['Username'] == u) & (db['Password'] == p)]
                 if not match.empty:
-                    st.session_state.logged_in = True
-                    st.session_state.current_user = u_in
-                    st.session_state.user_role = match.iloc[0]['Role']
-                    st.session_state.user_status = match.iloc[0]['Status']
-                    # REDIRECT: Setting state and refreshing to land on Home tab
+                    st.session_state.logged_in, st.session_state.current_user = True, u
+                    st.session_state.user_role, st.session_state.user_status = match.iloc[0]['Role'], match.iloc[0]['Status']
                     st.rerun()
                 else: st.error("Invalid credentials.")
         else:
-            # Registration Logic...
-            r_name = st.text_input("Full Name *", key="r_n")
-            r_mob = st.text_input("Mobile *", key="r_m")
-            r_email = st.text_input("Email *", key="r_e")
-            r_user = st.text_input("Username *", key="r_u")
-            r_pass = st.text_input("Password *", type="password", key="r_p")
-            r_pkg = st.selectbox("Select Package", ["Free", "Paid"], key="r_s")
+            r_name = st.text_input("Full Name *", key="reg_name")
+            r_user = st.text_input("Username *", key="reg_u")
+            r_pass = st.text_input("Password *", type="password", key="reg_p")
             if st.button("Create Account"):
-                if all([r_name, r_mob, r_email, r_user, r_pass]):
-                    new_user = {"Username": r_user, "Password": r_pass, "Role": "Trial", "Status": r_pkg, "Name": r_name, "Mobile": r_mob, "Email": r_email}
+                if r_name.strip() and r_user.strip() and r_pass.strip():
+                    new_user = {"Username": r_user, "Password": r_pass, "Role": "Trial", "Status": "Free", "Name": r_name}
                     st.session_state.users_db = pd.concat([st.session_state.users_db, pd.DataFrame([new_user])], ignore_index=True)
                     st.session_state.users_db.to_csv(DB_FILE, index=False)
-                    st.success("✅ Registered! Please Login.")
+                    st.success("✅ Registered! Switch to Login.")
                 else: st.error("Fill required fields.")
     else:
         st.button("Sign Out", on_click=lambda: st.session_state.update({"logged_in": False}))
 
-# --- 7. FOOTER ---
+# --- 7. FOOTER RENDERING ---
 footer_logo_html = f'<img src="data:image/png;base64,{logo_uday_b64}" class="footer-logo">' if logo_uday_b64 else ""
 st.markdown(f"""
     <div class="footer-container">
