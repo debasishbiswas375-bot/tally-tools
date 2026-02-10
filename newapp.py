@@ -18,7 +18,7 @@ st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap');
         html, body, [class*="css"] { font-family: 'Poppins', sans-serif; }
-        .main-header { color: #2E86C1; font-weight: 600; font-size: 2.5rem; margin-bottom: 0px; }
+        .main-header { color: #2E86C1; font-weight: 600; font-size: 2.5rem; margin-bottom: 0px; line-height: 1.2;}
         .sub-header { color: #566573; font-size: 1.1rem; margin-bottom: 30px; }
         .step-container { background-color: #f8f9fa; padding: 20px; border-radius: 10px; border: 1px solid #e9ecef; margin-bottom: 20px; }
         .stButton>button { width: 100%; background-color: #2E86C1; color: white; border-radius: 8px; height: 50px; font-weight: 600; }
@@ -133,8 +133,6 @@ def normalize_bank_data(df, bank_name):
         'HDFC Bank': {'Date': 'Date', 'Narration': 'Narration', 'Withdrawal Amt.': 'Debit', 'Deposit Amt.': 'Credit'},
         'Kotak Mahindra': {'Transaction Date': 'Date', 'Transaction Details': 'Narration', 'Withdrawal Amount': 'Debit', 'Deposit Amount': 'Credit'},
         'Yes Bank': {'Value Date': 'Date', 'Description': 'Narration', 'Debit Amount': 'Debit', 'Credit Amount': 'Credit'},
-        
-        # --- NEW BANKS ADDED ---
         'Indian Bank': {'Value Date': 'Date', 'Narration': 'Narration', 'Debit': 'Debit', 'Credit': 'Credit'},
         'India Post (IPPB)': {'Date': 'Date', 'Remarks': 'Narration', 'Debit Amount': 'Debit', 'Credit Amount': 'Credit'},
         'RBL Bank': {'Transaction Date': 'Date', 'Transaction Description': 'Narration', 'Withdrawal Amount': 'Debit', 'Deposit Amount': 'Credit'}
@@ -183,95 +181,4 @@ def generate_tally_xml(df, bank_ledger_name, default_party_ledger):
             
         narration = str(row['Narration']).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
-        xml_body += f"""<TALLYMESSAGE xmlns:UDF="TallyUDF"><VOUCHER VCHTYPE="{vch_type}" ACTION="Create" OBJVIEW="Accounting Voucher View"><DATE>{date_str}</DATE><NARRATION>{narration}</NARRATION><VOUCHERTYPENAME>{vch_type}</VOUCHERTYPENAME><ALLLEDGERENTRIES.LIST><LEDGERNAME>{led_1_name}</LEDGERNAME><ISDEEMEDPOSITIVE>{led_1_pos}</ISDEEMEDPOSITIVE><AMOUNT>{led_1_amt}</AMOUNT></ALLLEDGERENTRIES.LIST><ALLLEDGERENTRIES.LIST><LEDGERNAME>{led_2_name}</LEDGERNAME><ISDEEMEDPOSITIVE>{led_2_pos}</ISDEEMEDPOSITIVE><AMOUNT>{led_2_amt}</AMOUNT></ALLLEDGERENTRIES.LIST></VOUCHER></TALLYMESSAGE>"""
-    return xml_header + xml_body + xml_footer
-
-# --- 3. UI LAYOUT ---
-with st.sidebar:
-    st.title("Tally Tools")
-    st.markdown("---")
-    st.markdown("### 📝 Instructions")
-    st.markdown("""
-    1. **Upload Master:** Load 'List of Accounts.html'.
-    2. **Settings:** Select Ledgers.
-    3. **Upload File:** Excel OR PDF statement.
-    4. **Generate:** Download XML.
-    """)
-    st.info("💡 Supports: Excel & PDF (SBI, HDFC, ICICI, IPPB, RBL, etc.)")
-
-col_logo, col_title = st.columns([1, 4])
-with col_logo:
-    try:
-        logo_img = Image.open('logo.png')
-        st.image(logo_img, use_container_width=True)
-    except: st.markdown("## 📊")
-
-with col_title:
-    st.markdown('<p class="main-header">Accounting Expert</p>', unsafe_allow_html=True)
-    st.markdown('<p class="sub-header">Excel & PDF to Tally XML Converter</p>', unsafe_allow_html=True)
-
-st.divider()
-
-# Container 1: Setup
-with st.container(border=True):
-    st.markdown("### 🛠️ Step 1: Configuration")
-    col1, col2 = st.columns(2)
-    with col1:
-        st.markdown("**1. Upload Master (Optional)**")
-        uploaded_html = st.file_uploader("Upload 'List of Accounts.html'", type=['html', 'htm'])
-        ledger_list = ["Suspense A/c", "Cash", "Bank"]
-        if uploaded_html:
-            extracted = get_ledger_names(uploaded_html)
-            if extracted:
-                ledger_list = extracted
-                st.success(f"✅ Loaded {len(ledger_list)} ledgers")
-    with col2:
-        st.markdown("**2. Ledger Mapping**")
-        bank_ledger = st.selectbox("Select Bank Ledger", ledger_list, index=0)
-        party_ledger = st.selectbox("Select Default Party", ledger_list, index=0)
-
-# Container 2: Processing
-with st.container(border=True):
-    st.markdown("### 📂 Step 2: Bank Statement")
-    
-    col3, col4 = st.columns([1, 2])
-    with col3:
-        bank_options = ["SBI", "PNB", "ICICI", "Axis Bank", "HDFC Bank", "Kotak Mahindra", "Yes Bank", "Indian Bank", "India Post (IPPB)", "RBL Bank", "Other"]
-        bank_choice = st.selectbox("Select Bank Format", bank_options)
-    
-    with col4:
-        uploaded_file = st.file_uploader("Upload Statement (Excel or PDF)", type=['xlsx', 'xls', 'pdf'])
-        
-        pdf_password = None
-        if uploaded_file is not None and uploaded_file.name.endswith('.pdf'):
-            st.warning("🔒 If PDF is password protected, enter it below:")
-            pdf_password = st.text_input("PDF Password", type="password")
-
-    if uploaded_file:
-        df_raw = load_bank_file(uploaded_file, password=pdf_password)
-        
-        if df_raw is not None:
-            df_clean = normalize_bank_data(df_raw, bank_choice)
-            
-            with st.expander("👁️ Preview Processed Data"):
-                st.dataframe(df_clean.head(), use_container_width=True)
-
-            st.write("") 
-            if st.button("✨ Generate Tally XML ✨"):
-                xml_data = generate_tally_xml(df_clean, bank_ledger, party_ledger)
-                st.balloons()
-                st.success("XML Generated! Download below:")
-                st.download_button("Download XML", xml_data, "tally_import.xml", "application/xml")
-        else:
-            if not pdf_password and uploaded_file.name.endswith('.pdf'):
-                st.info("ℹ️ If the PDF is encrypted, please enter the password above.")
-            else:
-                st.error("❌ Error reading file. Ensure it is a valid Statement format.")
-
-# Footer
-st.markdown("""
-    <div class="footer">
-        <p>Powered & Created by <b>Debasish Biswas</b> | Professional Tally Automation</p>
-        <p style="font-size: 20px; margin-top: 5px;">Sponsored By Uday Mondal | Consultant Advocate</p>
-    </div>
-""", unsafe_allow_html=True)
+        xml_body += f"""<TALLYMESSAGE xmlns:UDF="TallyUDF"><VOUCHER VCHTYPE="{vch_type}" ACTION="Create" OBJVIEW="Accounting Voucher View"><DATE>{date_str}</DATE><NARRATION>{narration}</NARRATION>
