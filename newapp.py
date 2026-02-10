@@ -26,14 +26,14 @@ if 'logged_in' not in st.session_state:
     st.session_state.user_role = None
     st.session_state.show_settings = False
 
-# --- 3. REFINED CSS (FIXING HOVER VISIBILITY & WHITE ZONES) ---
+# --- 3. REFINED CSS (FIXING HOVER VISIBILITY & NAV DESIGN) ---
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
         
         .stApp { background-color: #0056D2; }
 
-        /* NAVIGATION TABS FIX */
+        /* --- NAVIGATION TABS --- */
         .stTabs {
             background-color: #0056D2;
             padding-top: 10px;
@@ -41,35 +41,44 @@ st.markdown("""
             border-bottom: 1px solid rgba(255,255,255,0.2);
         }
         
-        .stTabs [data-baseweb="tab-list"] { gap: 15px; justify-content: flex-end; padding-right: 20px; }
+        .stTabs [data-baseweb="tab-list"] { 
+            gap: 15px; 
+            justify-content: flex-end; 
+            padding-right: 20px; 
+        }
         
-        /* Default Tab Style */
+        /* Default Tab Text (White) */
         .stTabs [data-baseweb="tab"] { 
             color: #FFFFFF !important; 
             font-weight: 600; 
             font-size: 1rem;
             border: none !important;
+            transition: all 0.3s ease;
         }
 
-        /* FIX: Hover Visibility - Turn text dark when background turns white */
+        /* HOVER STATE: White Background with Dark Blue Text */
         .stTabs [data-baseweb="tab"]:hover {
             background-color: #FFFFFF !important;
             color: #0056D2 !important;
-            border-radius: 8px;
+            border-radius: 8px !important;
         }
         
-        /* Selected Tab Style */
+        /* ACTIVE/SELECTED STATE: Solid White with Dark Blue Text */
         .stTabs [aria-selected="true"] { 
             background-color: #FFFFFF !important; 
             color: #0056D2 !important; 
-            border-radius: 8px 8px 0 0; 
+            border-radius: 8px 8px 0 0 !important; 
         }
 
-        /* TEXT READABILITY */
+        /* --- TEXT & HEADINGS --- */
         h1, h2, h3, p, span, label, .stMarkdown { color: #FFFFFF !important; }
         
-        /* INPUT FIELD LABELS */
-        .stTextInput label, .stSelectbox label, .stFileUploader label { color: #FFFFFF !important; }
+        /* SIGN IN INPUT FIELDS (Matches Screenshot image_01d2d7.png) */
+        .stTextInput input {
+            background-color: #F0F2F6 !important;
+            color: #1E293B !important;
+            border-radius: 8px !important;
+        }
 
         /* PINNED FOOTER */
         .footer {
@@ -85,19 +94,19 @@ st.markdown("""
         }
         .footer p, .footer b { color: #1E293B !important; margin: 0; }
 
-        /* BUTTONS HOVER FIX */
+        /* BUTTONS (Green Style from image_014b1c.png) */
         div.stButton > button {
-            background-color: #66E035;
-            color: #0056D2;
-            border-radius: 50px;
-            font-weight: 700;
-            border: none;
-            transition: 0.3s;
+            background-color: #66E035 !important;
+            color: #0056D2 !important;
+            border-radius: 50px !important;
+            font-weight: 700 !important;
+            border: none !important;
+            padding: 10px 30px !important;
         }
         div.stButton > button:hover {
             background-color: #FFFFFF !important;
             color: #0056D2 !important;
-            border: 2px solid #66E035 !important;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2) !important;
         }
 
         header {visibility: hidden;}
@@ -125,6 +134,7 @@ tabs = st.tabs(["Home", "Solutions", "Pricing", "Login", "Register"])
 
 with tabs[0]: # HOME
     if st.session_state.logged_in:
+        # Profile/Settings Toggle
         p_col1, p_col2 = st.columns([12, 1.5])
         with p_col2:
             if st.button("👤 Profile"):
@@ -136,7 +146,7 @@ with tabs[0]: # HOME
             new_pass = st.text_input("Change Password", type="password")
             if st.button("Save Profile"):
                 idx = st.session_state.users_db[st.session_state.users_db['Username'] == st.session_state.current_user].index[0]
-                if new_pass: st.session_state.users_db.at[idx, 'Password'] = new_pass
+                if new_pass: st.session_state.users_db.at(idx, 'Password'] = new_pass
                 st.success("Profile Updated!")
                 st.session_state.show_settings = False
                 st.rerun()
@@ -146,7 +156,7 @@ with tabs[0]: # HOME
         else:
             st.markdown(f"<h1>Welcome back, {st.session_state.current_user}!</h1>", unsafe_allow_html=True)
             if st.session_state.user_role == "Admin":
-                st.markdown("### 🛠️ Converter Tool (Full Access)")
+                st.markdown("### 🛠️ Converter Tool (Full Access Admin Mode)")
                 c1, c2 = st.columns(2, gap="large")
                 with c1:
                     with st.container(border=True):
@@ -161,12 +171,12 @@ with tabs[0]: # HOME
                 st.warning("⚠️ Trial Mode: Please contact the Admin for Full Access.")
     else:
         st.markdown('<h1>Perfecting the Science of Data Extraction</h1>', unsafe_allow_html=True)
-        st.info("👋 Use the Login or Register tabs to begin.")
+        st.info("👋 Welcome! Please use the Login or Register tabs to begin processing your files.")
 
-with tabs[3]: # LOGIN
+with tabs[3]: # LOGIN (Matches image_01d2d7.png design)
     st.markdown("## 🔐 Sign In")
-    l_u = st.text_input("Username", key="l_u")
-    l_p = st.text_input("Password", type="password", key="l_p")
+    l_u = st.text_input("Username", key="l_u", placeholder="Enter your username")
+    l_p = st.text_input("Password", type="password", key="l_p", placeholder="Enter your password")
     if st.button("Sign In"):
         db = st.session_state.users_db
         user_match = db[(db['Username'] == l_u) & (db['Password'] == l_p)]
