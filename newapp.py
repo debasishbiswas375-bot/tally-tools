@@ -297,7 +297,10 @@ with st.container(border=True):
 # Footer
 st.markdown("""
     <div class="footer">
-        <p>Powered by <b>Accounting Expert</b> | Professional Tally Automation</p>
+        <p>Powered & Created by <b>Debasish.biswas</b> | Professional Tally Automation</p>
+    </div>
+     <div class="footer">
+        <p>Sponsored by<b>Uday Mondal</b> | Consultant Advocate</p>
     </div>
 """, unsafe_allow_html=True)
 
