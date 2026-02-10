@@ -305,4 +305,51 @@ with col_left:
 # --- RIGHT CARD: ACTION AREA ---
 with col_right:
     with st.container(border=True):
-        st.markdown("
+        st.markdown("### 📂 2. Upload & Convert")
+        
+        # Split bank selection and password into a row
+        c1, c2 = st.columns([1.5, 1])
+        with c1:
+            bank_choice = st.selectbox("Select Bank Format", ["SBI", "PNB", "ICICI", "Axis Bank", "HDFC Bank", "Kotak Mahindra", "Yes Bank", "Indian Bank", "India Post (IPPB)", "RBL Bank", "Other"])
+        with c2:
+            pdf_password = st.text_input("PDF Password", type="password", placeholder="Optional")
+
+        uploaded_file = st.file_uploader("Drop your Statement here (Excel or PDF)", type=['xlsx', 'xls', 'pdf'])
+        
+        if uploaded_file:
+            st.divider() # Visual separator
+            
+            with st.spinner("Analyzing document structure..."):
+                df_raw = load_bank_file(uploaded_file, pdf_password)
+            
+            if df_raw is not None:
+                df_clean = normalize_bank_data(df_raw, bank_choice)
+                
+                # Show a clean preview
+                st.write(" **Data Preview:**")
+                st.dataframe(df_clean.head(3), use_container_width=True, hide_index=True)
+                
+                st.write("")
+                if st.button("🚀 Convert to Tally XML"):
+                    xml_data = generate_tally_xml(df_clean, bank_ledger, party_ledger)
+                    st.balloons()
+                    st.success("Conversion Successful! Ready for Import.")
+                    st.download_button("⬇️ Download XML File", xml_data, "tally_import.xml", "application/xml")
+            else:
+                st.error("⚠️ Could not read file. Check format or password.")
+
+# --- 6. FOOTER ---
+# Logic to load the logo safely
+try:
+    img_b64 = get_img_as_base64("logo 1.png")
+    if not img_b64: img_b64 = get_img_as_base64("logo.png")
+except: img_b64 = None
+
+logo_html = f'<img src="data:image/png;base64,{img_b64}" width="20" style="vertical-align: middle; margin-right: 8px;">' if img_b64 else ""
+
+st.markdown(f"""
+    <div class="footer">
+        <p>Sponsored By {logo_html} <span class="brand-link" style="color:#0F172A;">Uday Mondal</span> | Consultant Advocate</p>
+        <p style="font-size: 13px; margin-top: 8px;">Powered & Created by <span class="brand-link">Debasish Biswas</span> | Professional Tally Automation</p>
+    </div>
+""", unsafe_allow_html=True)
