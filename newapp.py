@@ -14,7 +14,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- 2. SESSION STATE INITIALIZATION ---
+# --- 2. SESSION STATE ---
 if 'users_db' not in st.session_state:
     st.session_state.users_db = pd.DataFrame([
         {"Username": "admin", "Password": "123", "Role": "Admin", "Pic": None},
@@ -27,7 +27,7 @@ if 'logged_in' not in st.session_state:
     st.session_state.user_role = None
     st.session_state.show_settings = False
 
-# --- 3. REFINED CSS FOR ENHANCED VISIBILITY ---
+# --- 3. REFINED CSS (FIXING FILE UPLOADER TEXT & NAV BAR) ---
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
@@ -56,33 +56,26 @@ st.markdown("""
             border-radius: 8px 8px 0 0; 
         }
 
-        /* --- VISIBILITY FIXES: BLACK TEXT FOR INTERNAL ELEMENTS --- */
-        /* Text inside input fields */
+        /* --- VISIBILITY FIX: BLACK TEXT FOR FILE UPLOADER & INPUTS --- */
+        /* This targets the 'Drag and drop file here' text */
+        [data-testid="stFileUploader"] section div div {
+            color: #000000 !important;
+        }
+        
+        /* Text inside selectboxes and inputs */
         input, .stTextInput input, .stSelectbox div {
             color: #000000 !important;
             font-weight: 500 !important;
         }
         
-        /* Placeholder text */
-        ::placeholder { color: #555555 !important; opacity: 1; }
-
-        /* Labels above input fields */
         label { color: #FFFFFF !important; font-weight: 600 !important; }
-
-        /* General Headings */
         h1, h2, h3, p, span, .stMarkdown { color: #FFFFFF !important; }
 
         /* PINNED FOOTER */
         .footer {
-            position: fixed;
-            left: 0;
-            bottom: 0;
-            width: 100%;
-            background-color: #FFFFFF;
-            text-align: center;
-            padding: 10px;
-            z-index: 2000;
-            border-top: 1px solid #E2E8F0;
+            position: fixed; left: 0; bottom: 0; width: 100%;
+            background-color: #FFFFFF; text-align: center;
+            padding: 10px; z-index: 2000; border-top: 1px solid #E2E8F0;
         }
         .footer p, .footer b { color: #1E293B !important; margin: 0; }
 
@@ -93,7 +86,6 @@ st.markdown("""
             border-radius: 50px !important;
             font-weight: 700 !important;
             border: none !important;
-            padding: 10px 30px !important;
         }
 
         header {visibility: hidden;}
@@ -103,11 +95,6 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- 4. LOGIC FUNCTIONS ---
-def get_img_as_base64(file_path):
-    try:
-        with open(file_path, "rb") as f: return base64.b64encode(f.read()).decode()
-    except: return None
-
 def get_ledger_names(html_file):
     try:
         soup = BeautifulSoup(html_file, 'html.parser')
@@ -120,6 +107,7 @@ tabs = st.tabs(["Home", "Solutions", "Pricing", "Login", "Register"])
 
 with tabs[0]: # HOME
     if st.session_state.logged_in:
+        # Profile Style Header
         p_col1, p_col2 = st.columns([12, 1.5])
         with p_col2:
             if st.button("👤 Profile"):
@@ -131,7 +119,7 @@ with tabs[0]: # HOME
             new_pass = st.text_input("Change Password", type="password")
             if st.button("Save Profile"):
                 idx = st.session_state.users_db[st.session_state.users_db['Username'] == st.session_state.current_user].index[0]
-                # --- FIXED SYNTAX ERROR ON LINE 149 ---
+                # Fix for line 149 syntax
                 if new_pass:
                     st.session_state.users_db.at[idx, 'Password'] = new_pass
                 st.success("Profile Updated!")
@@ -148,6 +136,7 @@ with tabs[0]: # HOME
                 with c1:
                     with st.container(border=True):
                         st.markdown("#### Upload Tally Master")
+                        # The text inside this box is now black for visibility
                         up_html = st.file_uploader("master.html", type=['html'])
                         ledgers = get_ledger_names(up_html) if up_html else ["Cash", "Bank"]
                         st.selectbox("Select Bank Ledger", ledgers)
@@ -164,8 +153,8 @@ with tabs[0]: # HOME
 
 with tabs[3]: # LOGIN
     st.markdown("## 🔐 Sign In")
-    l_u = st.text_input("Username", key="l_u", placeholder="Enter username")
-    l_p = st.text_input("Password", type="password", key="l_p", placeholder="Enter password")
+    l_u = st.text_input("Username", key="l_u")
+    l_p = st.text_input("Password", type="password", key="l_p")
     if st.button("Sign In"):
         db = st.session_state.users_db
         user_match = db[(db['Username'] == l_u) & (db['Password'] == l_p)]
@@ -176,27 +165,9 @@ with tabs[3]: # LOGIN
             st.rerun()
         else: st.error("Invalid credentials.")
 
-with tabs[4]: # REGISTER
-    st.markdown("## 🚀 Register Account")
-    r_u = st.text_input("New Username", key="r_u", placeholder="Choose username")
-    r_p = st.text_input("New Password", type="password", key="r_p", placeholder="Choose password")
-    if st.button("Register Now"):
-        if r_u in st.session_state.users_db['Username'].values:
-            st.error("Username already exists!")
-        else:
-            new_user = pd.DataFrame([{"Username": r_u, "Password": r_p, "Role": "Trial", "Pic": None}])
-            st.session_state.users_db = pd.concat([st.session_state.users_db, new_user], ignore_index=True)
-            st.success("Account created as 'Trial'. Please Login.")
-
 # --- 6. PINNED GLOBAL FOOTER ---
-try:
-    uday_logo_b64 = get_img_as_base64("logo 1.png")
-    uday_logo_html = f'<img src="data:image/png;base64,{uday_logo_b64}" width="20" style="vertical-align:middle; margin-right:5px;">' if uday_logo_b64 else ""
-except: uday_logo_html = ""
-
 st.markdown(f"""
     <div class="footer">
-        <p>Sponsored By {uday_logo_html} <b>Uday Mondal</b> | Consultant Advocate</p>
-        <p style="font-size: 11px; margin-top: 4px; color: #64748B !important;">Powered & Created by <b>Debasish Biswas</b></p>
+        <p>Sponsored By <b>Uday Mondal</b> | Powered & Created by <b>Debasish Biswas</b></p>
     </div>
 """, unsafe_allow_html=True)
