@@ -9,100 +9,114 @@ import base64
 # --- 1. PAGE CONFIGURATION ---
 st.set_page_config(
     page_title="Accounting Expert | AI Bank to Tally",
-    page_icon="📊",
+    page_icon="logo.png",
     layout="wide",
     initial_sidebar_state="collapsed"
 )
 
-# --- 2. CAELUM-STYLE CSS (THE PROFESSIONAL LOOK) ---
+# --- 2. FUTURISTIC TALLY THEME CSS ---
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
         
-        /* Global Font & Colors */
+        /* Global Background */
         html, body, [class*="css"] {
             font-family: 'Inter', sans-serif;
-            background-color: #F1F5F9; /* Slate-100 Background */
+            background-color: #F8FAFC; 
             color: #0F172A;
         }
 
-        /* Hero Section (Top Banner) */
+        /* FUTURISTIC HERO SECTION (Tally Green + Tech Blue Gradient) */
         .hero-container {
             text-align: center;
-            padding: 60px 20px 40px 20px;
-            background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%); /* Slate-900 */
+            padding: 50px 20px 50px 20px;
+            /* Gradient: Deep Green to Modern Blue */
+            background: linear-gradient(135deg, #065F46 0%, #1E40AF 100%);
             color: white;
             margin: -6rem -4rem 30px -4rem; /* Stretch to edges */
-            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
+            box-shadow: 0 10px 30px -10px rgba(6, 95, 70, 0.5);
+            position: relative;
+            overflow: hidden;
         }
+        
+        /* Subtle Tech Grid Pattern Overlay */
+        .hero-container::before {
+            content: "";
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-image: 
+                linear-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px), 
+                linear-gradient(90deg, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+            background-size: 30px 30px;
+            pointer-events: none;
+        }
+
         .hero-title {
             font-size: 3.5rem;
             font-weight: 800;
-            margin-bottom: 10px;
-            letter-spacing: -0.025em;
-            background: -webkit-linear-gradient(#60A5FA, #3B82F6);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
+            margin-top: 10px;
+            margin-bottom: 5px;
+            text-shadow: 0 4px 10px rgba(0,0,0,0.3);
         }
+        
         .hero-subtitle {
-            font-size: 1.25rem;
-            color: #94A3B8; /* Slate-400 */
-            font-weight: 400;
-            max-width: 600px;
-            margin: 0 auto;
-            line-height: 1.6;
+            font-size: 1.2rem;
+            color: #E2E8F0;
+            font-weight: 300;
+            opacity: 0.9;
         }
 
-        /* Card Styling (White Boxes) */
+        /* Card Styling (Glass-like White) */
         .stContainer {
             background-color: white;
-            padding: 25px;
+            padding: 30px;
             border-radius: 16px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
+            box-shadow: 0 4px 20px -5px rgba(0, 0, 0, 0.05);
             border: 1px solid #E2E8F0;
         }
-
-        /* Headlines inside cards */
+        
+        /* Headers inside cards (Tally Green Accent) */
         h3 {
-            font-size: 1.1rem !important;
-            font-weight: 600 !important;
-            color: #334155 !important;
-            margin-bottom: 1rem !important;
+            font-size: 1.2rem !important;
+            font-weight: 700 !important;
+            color: #1e293b !important;
+            border-left: 5px solid #10B981; /* Green bar */
+            padding-left: 12px;
         }
 
-        /* Button Styling (Caelum Blue) */
+        /* Buttons (Green/Blue Gradient) */
         .stButton>button {
             width: 100%;
-            background-color: #2563EB; /* Primary Blue */
+            background: linear-gradient(90deg, #10B981 0%, #3B82F6 100%);
             color: white;
             border-radius: 8px;
-            height: 50px;
+            height: 55px;
+            font-size: 1rem;
             font-weight: 600;
             border: none;
-            transition: all 0.2s;
-            box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+            transition: all 0.3s ease;
         }
         .stButton>button:hover {
-            background-color: #1D4ED8;
-            transform: translateY(-1px);
-            box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.4);
         }
 
-        /* Footer Styling */
+        /* Footer */
         .footer {
             margin-top: 60px;
-            padding: 30px;
+            padding: 40px;
             text-align: center;
             color: #64748B;
             font-size: 0.9rem;
             border-top: 1px solid #E2E8F0;
             background-color: white;
-            margin-bottom: -50px;
+            margin-bottom: -60px;
         }
         .brand-link {
-            color: #2563EB;
+            color: #059669;
             text-decoration: none;
-            font-weight: 600;
+            font-weight: 700;
         }
         
         /* Hide Default Streamlit Elements */
@@ -110,16 +124,16 @@ st.markdown("""
         footer {visibility: hidden;}
         header {visibility: hidden;}
         
-        /* Custom Success Message */
+        /* Success Message Box */
         .stAlert {
-            background-color: #ECFDF5;
+            background-color: #F0FDF4;
             border: 1px solid #10B981;
-            color: #065F46;
+            color: #166534;
         }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. HELPER FUNCTIONS (LOGIC) ---
+# --- 3. HELPER FUNCTIONS ---
 
 def get_img_as_base64(file):
     try:
@@ -151,7 +165,7 @@ def clean_currency(value):
     try: return float(val_str)
     except: return 0.0
 
-# PDF Extraction Logic
+# PDF Extraction
 def extract_data_from_pdf(file, password=None):
     all_rows = []
     try:
@@ -172,7 +186,7 @@ def extract_data_from_pdf(file, password=None):
         for i, row in df.iterrows():
             row_str = row.astype(str).str.lower().values
             if any('date' in x for x in row_str) and \
-               (any('balance' in x for x in row_str) or any('debit' in x for x in row_str) or any('withdrawal' in x for x in row_str)):
+               (any('balance' in x for x in row_str) or any('debit' in x for x in row_str)):
                 header_idx = i
                 found = True
                 break
@@ -194,7 +208,6 @@ def load_bank_file(file, password=None):
         except: return None
 
 def normalize_bank_data(df, bank_name):
-    # Standardize Column Names
     df.columns = df.columns.astype(str).str.replace('\n', ' ').str.strip()
     target_columns = ['Date', 'Narration', 'Debit', 'Credit']
     
@@ -273,41 +286,46 @@ def generate_tally_xml(df, bank_ledger_name, default_party_ledger):
         
     return xml_header + xml_body + xml_footer
 
-# --- 4. HERO SECTION (HTML INJECTION) ---
-st.markdown("""
+# --- 4. HERO SECTION WITH LOGO ---
+# Load logo safely
+try:
+    img_b64 = get_img_as_base64("logo.png")
+except: img_b64 = None
+
+logo_html = f'<img src="data:image/png;base64,{img_b64}" width="120" style="margin-bottom: 20px;">' if img_b64 else ""
+
+st.markdown(f"""
     <div class="hero-container">
+        {logo_html}
         <div class="hero-title">Accounting Expert</div>
         <div class="hero-subtitle">Turn messy Bank Statements into Tally Vouchers in seconds.<br>Supports Excel & PDF. 99% Accuracy.</div>
     </div>
 """, unsafe_allow_html=True)
 
 # --- 5. MAIN DASHBOARD ---
-# We use a 2-column layout that looks like a SaaS dashboard
 col_left, col_right = st.columns([1, 1.5], gap="large")
 
-# --- LEFT CARD: CONFIGURATION ---
+# LEFT CARD: CONFIGURATION
 with col_left:
-    with st.container(border=True):
+    with st.container():
         st.markdown("### 🛠️ 1. Settings & Mapping")
         
-        uploaded_html = st.file_uploader("Upload Tally Master (Optional)", type=['html', 'htm'], help="Upload 'List of Accounts.html' exported from Tally to auto-fill ledger names.")
-        
+        uploaded_html = st.file_uploader("Upload Tally Master (Optional)", type=['html', 'htm'])
         ledger_list = ["Suspense A/c", "Cash", "Bank"]
         if uploaded_html:
             extracted = get_ledger_names(uploaded_html)
             if extracted:
                 ledger_list = extracted
-                st.success(f"✅ Synced {len(ledger_list)} ledgers from Master")
+                st.success(f"✅ Synced {len(ledger_list)} ledgers")
             
         bank_ledger = st.selectbox("Select Bank Ledger", ledger_list, index=0)
         party_ledger = st.selectbox("Select Default Party", ledger_list, index=0)
 
-# --- RIGHT CARD: ACTION AREA ---
+# RIGHT CARD: ACTION AREA
 with col_right:
-    with st.container(border=True):
+    with st.container():
         st.markdown("### 📂 2. Upload & Convert")
         
-        # Split bank selection and password into a row
         c1, c2 = st.columns([1.5, 1])
         with c1:
             bank_choice = st.selectbox("Select Bank Format", ["SBI", "PNB", "ICICI", "Axis Bank", "HDFC Bank", "Kotak Mahindra", "Yes Bank", "Indian Bank", "India Post (IPPB)", "RBL Bank", "Other"])
@@ -317,16 +335,14 @@ with col_right:
         uploaded_file = st.file_uploader("Drop your Statement here (Excel or PDF)", type=['xlsx', 'xls', 'pdf'])
         
         if uploaded_file:
-            st.divider() # Visual separator
-            
+            st.markdown("---")
             with st.spinner("Analyzing document structure..."):
                 df_raw = load_bank_file(uploaded_file, pdf_password)
             
             if df_raw is not None:
                 df_clean = normalize_bank_data(df_raw, bank_choice)
                 
-                # Show a clean preview
-                st.write(" **Data Preview:**")
+                st.write("**Data Preview:**")
                 st.dataframe(df_clean.head(3), use_container_width=True, hide_index=True)
                 
                 st.write("")
@@ -339,17 +355,12 @@ with col_right:
                 st.error("⚠️ Could not read file. Check format or password.")
 
 # --- 6. FOOTER ---
-# Logic to load the logo safely
-try:
-    img_b64 = get_img_as_base64("logo 1.png")
-    if not img_b64: img_b64 = get_img_as_base64("logo.png")
-except: img_b64 = None
-
-logo_html = f'<img src="data:image/png;base64,{img_b64}" width="20" style="vertical-align: middle; margin-right: 8px;">' if img_b64 else ""
+# Mini logo for footer
+mini_logo_html = f'<img src="data:image/png;base64,{img_b64}" width="20" style="vertical-align: middle; margin-right: 8px;">' if img_b64 else ""
 
 st.markdown(f"""
     <div class="footer">
-        <p>Sponsored By {logo_html} <span class="brand-link" style="color:#0F172A;">Uday Mondal</span> | Consultant Advocate</p>
+        <p>Sponsored By {mini_logo_html} <span class="brand-link" style="color:#0F172A;">Uday Mondal</span> | Consultant Advocate</p>
         <p style="font-size: 13px; margin-top: 8px;">Powered & Created by <span class="brand-link">Debasish Biswas</span> | Professional Tally Automation</p>
     </div>
 """, unsafe_allow_html=True)
