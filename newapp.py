@@ -25,7 +25,7 @@ if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.current_user = None
 
-# --- 3. CUSTOM CSS (NAVBAR & STYLING) ---
+# --- 3. CUSTOM CSS (CLEAN WHITE THEME) ---
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
@@ -36,17 +36,16 @@ st.markdown("""
             color: #0F172A;
         }
 
-        /* --- NAVIGATION TABS (THE HEADER) --- */
-        /* This makes the Streamlit Tabs look like the Blue Navbar */
+        /* --- NAVIGATION TABS (Blue Strip) --- */
         .stTabs {
-            background-color: #0056D2; /* The Header Blue */
+            background-color: #0056D2; /* Keeping Navbar Blue for contrast */
             padding-top: 10px;
             padding-bottom: 0px;
             margin-top: -6rem; 
             position: sticky;
             top: 0;
             z-index: 999;
-            box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
 
         .stTabs [data-baseweb="tab-list"] {
@@ -56,86 +55,84 @@ st.markdown("""
         }
 
         .stTabs [data-baseweb="tab"] {
-            height: 60px;
+            height: 50px;
             white-space: pre-wrap;
             background-color: transparent;
             border: none;
-            color: rgba(255, 255, 255, 0.85);
+            color: rgba(255, 255, 255, 0.9);
             font-weight: 500;
             font-size: 1rem;
-            padding: 0 15px;
         }
 
         .stTabs [data-baseweb="tab"]:hover {
             color: #FFFFFF;
-            background-color: rgba(255,255,255,0.1);
-            border-radius: 8px;
         }
 
         .stTabs [aria-selected="true"] {
-            background-color: #FFFFFF !important;
-            color: #0056D2 !important;
-            border-radius: 50px;
+            background-color: rgba(255, 255, 255, 0.1) !important;
+            color: #FFFFFF !important;
+            border-bottom: 4px solid #66E035; /* Green Active Line */
             font-weight: 700;
-            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
         }
 
-        /* --- HERO SECTION --- */
+        /* --- HERO SECTION (WHITE BACKGROUND) --- */
         .hero-container {
-            background-color: #0056D2; /* Match Header */
-            color: white;
-            padding: 40px 60px 80px 60px;
+            background-color: #FFFFFF; /* Pure White */
+            color: #0F172A;
+            padding: 40px 60px 40px 60px;
             margin: 0 -4rem 0 -4rem;
+            border-bottom: 1px solid #F1F5F9;
         }
         
         .hero-title {
-            font-size: 3.5rem;
+            font-size: 3.2rem;
             font-weight: 800;
             line-height: 1.1;
             margin-bottom: 20px;
-            color: white !important;
+            color: #0056D2 !important; /* Dark Blue Text */
         }
         
         .hero-subtitle {
-            font-size: 1.2rem;
-            opacity: 0.9;
+            font-size: 1.1rem;
+            opacity: 0.8;
             margin-bottom: 30px;
             line-height: 1.6;
-            color: #E0E7FF !important;
+            color: #334155 !important; /* Dark Grey Text */
         }
 
         /* --- FORM CARDS --- */
         .auth-card {
-            background-color: white;
+            background-color: #FFFFFF;
             padding: 30px;
             border-radius: 12px;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.15);
+            border: 1px solid #E2E8F0;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
             color: #333;
         }
 
         /* --- BUTTONS --- */
         div[data-testid="stButton"] button {
-            background-color: #66E035; /* Bright Green */
-            color: #0056D2;
+            background-color: #0056D2; /* Blue Buttons */
+            color: white;
             font-weight: 700;
-            border-radius: 50px;
+            border-radius: 8px;
             border: none;
             width: 100%;
-            padding: 12px;
+            padding: 10px;
+            height: 45px;
         }
         div[data-testid="stButton"] button:hover {
-            background-color: #5AC72E;
-            color: white;
+            background-color: #0044A0;
         }
 
         /* Footer */
         .footer {
-            margin-top: 100px;
+            margin-top: 80px;
             padding: 30px;
             text-align: center;
             color: #64748B;
             border-top: 1px solid #eee;
-            background-color: white;
+            background-color: #F8FAFC;
             margin-bottom: -50px;
         }
         
@@ -249,22 +246,18 @@ def generate_tally_xml(df, bank_ledger_name, default_party_ledger):
         xml_body += f"""<TALLYMESSAGE xmlns:UDF="TallyUDF"><VOUCHER VCHTYPE="{vch_type}" ACTION="Create" OBJVIEW="Accounting Voucher View"><DATE>{date_str}</DATE><NARRATION>{narration}</NARRATION><VOUCHERTYPENAME>{vch_type}</VOUCHERTYPENAME><ALLLEDGERENTRIES.LIST><LEDGERNAME>{l1}</LEDGERNAME><ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE><AMOUNT>{-amount}</AMOUNT></ALLLEDGERENTRIES.LIST><ALLLEDGERENTRIES.LIST><LEDGERNAME>{l2}</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>{amount}</AMOUNT></ALLLEDGERENTRIES.LIST></VOUCHER></TALLYMESSAGE>"""
     return f"<ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>Vouchers</REPORTNAME></REQUESTDESC><REQUESTDATA>{xml_body}</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>"
 
-# --- 5. MAIN NAVIGATION (HEADER) ---
-# We use Tabs to create a functional Navbar
+# --- 5. MAIN NAVIGATION ---
 tabs = st.tabs(["Home", "Solutions", "Pricing", "Login", "Start Free Trial"])
 
 # --- TAB 1: HOME ---
 with tabs[0]:
-    # Hero Section (Blue Background)
     with st.container():
         st.markdown('<div class="hero-container">', unsafe_allow_html=True)
         
-        # If user is logged in, just show the tool directly
         if st.session_state.logged_in:
             st.markdown(f"## Welcome back, {st.session_state.current_user}!")
-            st.markdown("Scroll down to use the converter.")
+            st.markdown("Your dashboard is ready below.")
         else:
-            # If not logged in, show the Split Layout (Text Left | Register Right)
             col_hero_left, col_hero_right = st.columns([1.5, 1], gap="large")
             
             with col_hero_left:
@@ -278,33 +271,40 @@ with tabs[0]:
                 try: hero_logo_b64 = get_img_as_base64("logo.png")
                 except: hero_logo_b64 = None
                 if hero_logo_b64:
-                    st.markdown(f'<img src="data:image/png;base64,{hero_logo_b64}" width="150" style="margin-top:20px; opacity:0.9;">', unsafe_allow_html=True)
+                    st.markdown(f'<img src="data:image/png;base64,{hero_logo_b64}" width="150" style="margin-top:20px;">', unsafe_allow_html=True)
 
             with col_hero_right:
-                # White Card for "Start Free Trial"
                 st.markdown('<div class="auth-card">', unsafe_allow_html=True)
                 st.markdown("### 🚀 Get Started")
-                st.markdown("No credit card required.")
                 
-                new_u = st.text_input("Username", key="home_reg_u", placeholder="Create Username")
-                new_p = st.text_input("Password", type="password", key="home_reg_p", placeholder="Create Password")
+                auth_mode = st.radio("Choose Option", ["Login", "Register for Free Trial"], horizontal=True, label_visibility="collapsed")
+                st.write("")
                 
-                if st.button("Start Free Trial Now"):
-                    if new_u and new_p:
-                        if new_u in st.session_state.users_db['Username'].values:
-                            st.error("Username taken.")
-                        else:
-                            new_entry = pd.DataFrame([{"Username": new_u, "Password": new_p, "Role": "User", "Status": "Active"}])
-                            st.session_state.users_db = pd.concat([st.session_state.users_db, new_entry], ignore_index=True)
-                            st.success("Account created! Go to Login tab.")
+                if auth_mode == "Login":
+                    u = st.text_input("Username", key="login_u")
+                    p = st.text_input("Password", type="password", key="login_p")
+                    if st.button("Sign In"):
+                        user = st.session_state.users_db[(st.session_state.users_db['Username'] == u) & (st.session_state.users_db['Password'] == p)]
+                        if not user.empty:
                             st.session_state.logged_in = True
-                            st.session_state.current_user = new_u
+                            st.session_state.current_user = u
                             st.rerun()
-                    else:
-                        st.warning("Please fill all fields.")
+                        else: st.error("Incorrect credentials.")
+                else:
+                    new_u = st.text_input("Create Username", key="reg_u")
+                    new_p = st.text_input("Create Password", type="password", key="reg_p")
+                    if st.button("Start Free Trial"):
+                        if new_u and new_p:
+                            if new_u in st.session_state.users_db['Username'].values:
+                                st.error("User exists.")
+                            else:
+                                new_entry = pd.DataFrame([{"Username": new_u, "Password": new_p, "Role": "User", "Status": "Active"}])
+                                st.session_state.users_db = pd.concat([st.session_state.users_db, new_entry], ignore_index=True)
+                                st.success("Account created! Please Login.")
+                        else: st.warning("Fill all details.")
                 st.markdown('</div>', unsafe_allow_html=True)
         
-        st.markdown('</div>', unsafe_allow_html=True) # End Hero
+        st.markdown('</div>', unsafe_allow_html=True)
 
     # --- MAIN TOOL AREA (Only visible if logged in) ---
     if st.session_state.logged_in:
@@ -351,32 +351,15 @@ with tabs[0]:
                     else:
                         st.error("⚠️ Error reading file. Check format or password.")
 
-# --- TAB 2 & 3: Placeholders ---
+# --- OTHER TABS ---
 with tabs[1]: st.info("Solutions - Coming Soon")
 with tabs[2]: st.info("Pricing - Coming Soon")
-
-# --- TAB 4: LOGIN ---
-with tabs[3]:
-    st.markdown("<br>", unsafe_allow_html=True)
-    c1, c2, c3 = st.columns([1, 1, 1])
-    with c2:
-        with st.container(border=True):
-            st.markdown("### 🔐 User Login")
-            u = st.text_input("Username", key="login_u")
-            p = st.text_input("Password", type="password", key="login_p")
-            if st.button("Login"):
-                user = st.session_state.users_db[(st.session_state.users_db['Username'] == u) & (st.session_state.users_db['Password'] == p)]
-                if not user.empty:
-                    st.session_state.logged_in = True
-                    st.session_state.current_user = u
-                    st.success("Logged in!")
-                    st.rerun()
-                else: st.error("Invalid credentials")
-
-# --- TAB 5: FREE TRIAL (Alternative Access) ---
-with tabs[4]:
-    st.markdown("<br>", unsafe_allow_html=True)
-    st.info("You can also register directly on the Home page.")
+with tabs[3]: 
+    if not st.session_state.logged_in: st.info("Use the Login form on the Home tab.")
+    else: 
+        st.success("You are logged in.")
+        if st.button("Logout", key="logout_btn"): st.session_state.logged_in=False; st.rerun()
+with tabs[4]: st.info("Register on the Home tab.")
 
 # --- FOOTER ---
 try: footer_logo_b64 = get_img_as_base64("logo 1.png")
@@ -385,7 +368,7 @@ footer_html = f'<img src="data:image/png;base64,{footer_logo_b64}" width="25" st
 
 st.markdown(f"""
     <div class="footer">
-        <p>Sponsored By {footer_html} <span style="color:#0044CC; font-weight:700">Uday Mondal</span> | Consultant Advocate</p>
-        <p style="font-size: 13px;">Powered & Created by <span style="color:#0044CC; font-weight:700">Debasish Biswas</span></p>
+        <p>Sponsored By {footer_html} <span style="color:#0056D2; font-weight:700">Uday Mondal</span> | Consultant Advocate</p>
+        <p style="font-size: 13px;">Powered & Created by <span style="color:#0056D2; font-weight:700">Debasish Biswas</span></p>
     </div>
 """, unsafe_allow_html=True)
