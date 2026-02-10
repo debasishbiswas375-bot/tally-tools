@@ -377,4 +377,53 @@ with tabs[0]:
                 
                 if auth_mode == "Login":
                     u = st.text_input("Username", key="home_login_u")
-                    p = st.text_input("Password", type="password", key="home_login_
+                    p = st.text_input("Password", type="password", key="home_login_p")
+                    if st.button("Access Dashboard"):
+                        user = st.session_state.users_db[(st.session_state.users_db['Username'] == u) & (st.session_state.users_db['Password'] == p)]
+                        if not user.empty:
+                            st.session_state.logged_in = True
+                            st.session_state.current_user = u
+                            st.rerun()
+                        else: st.error("Incorrect username or password.")
+                else:
+                    new_u = st.text_input("Create Username", key="home_reg_u")
+                    new_p = st.text_input("Create Password", type="password", key="home_reg_p")
+                    if st.button("Start Free Trial"):
+                        if new_u and new_p:
+                             if new_u in st.session_state.users_db['Username'].values:
+                                st.error("User already exists.")
+                             else:
+                                new_entry = pd.DataFrame([{"Username": new_u, "Password": new_p, "Role": "User", "Status": "Active"}])
+                                st.session_state.users_db = pd.concat([st.session_state.users_db, new_entry], ignore_index=True)
+                                st.success("Account Created! You can now Login.")
+                        else: st.warning("Please fill details.")
+
+# --- TAB 2 & 3: PLACEHOLDERS ---
+with tabs[1]: st.info("Solutions Page - Coming Soon...")
+with tabs[2]: st.info("Pricing Page - Coming Soon...")
+
+# --- TAB 4: USER MANAGEMENT ---
+with tabs[3]:
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.session_state.logged_in:
+        st.success(f"Logged in as: {st.session_state.current_user}")
+        if st.button("Logout"):
+            st.session_state.logged_in = False
+            st.rerun()
+        st.divider()
+        st.markdown("### 👥 User Database (Admin View)")
+        st.dataframe(st.session_state.users_db, use_container_width=True)
+    else:
+        st.warning("Please Login from the Home Page first.")
+
+# --- FOOTER ---
+try: footer_logo_b64 = get_img_as_base64("logo 1.png")
+except: footer_logo_b64 = None
+footer_html = f'<img src="data:image/png;base64,{footer_logo_b64}" width="25" style="vertical-align: middle;">' if footer_logo_b64 else ""
+
+st.markdown(f"""
+    <div class="footer">
+        <p>Sponsored By {footer_html} <span style="color:#0044CC; font-weight:700">Uday Mondal</span> | Consultant Advocate</p>
+        <p style="font-size: 13px;">Powered & Created by <span style="color:#0044CC; font-weight:700">Debasish Biswas</span></p>
+    </div>
+""", unsafe_allow_html=True)
