@@ -300,12 +300,6 @@ st.markdown("""
         <p>Powered & Created by <b>Debasish.biswas</b> | Professional Tally Automation</p>
     </div>
 # Footer
-# Footer
-st.markdown("""
-    <div class="footer">
-        <p>Powered & Created by <b>Debasish.biswas</b> | Professional Tally Automation</p>
-    </div>
-# Footer
 
 """, unsafe_allow_html=True)
 
