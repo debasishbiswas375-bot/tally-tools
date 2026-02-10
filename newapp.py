@@ -117,15 +117,4 @@ def load_bank_file(file, password=None):
                     break
             if found:
                 file.seek(0)
-                return pd.read_excel(file, header=header_idx)
-            return pd.read_excel(file)
-        except: return None
-
-def normalize_bank_data(df, bank_name):
-    target_columns = ['Date', 'Narration', 'Debit', 'Credit']
-    df.columns = df.columns.astype(str).str.replace('\n', ' ').str.strip()
-    
-    mappings = {
-        'SBI': {'Txn Date': 'Date', 'Description': 'Narration', 'Debit': 'Debit', 'Credit': 'Credit'},
-        'PNB': {'Transaction Date': 'Date', 'Narration': 'Narration', 'Debit Amount': 'Debit', 'Credit Amount': 'Credit'},
-        'ICICI': {'Value Date': 'Date', 'Transaction Remarks': 'Narration', 'Withdrawal Amount (
+                return pd.read_excel(file, header=
