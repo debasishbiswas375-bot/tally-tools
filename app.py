@@ -289,7 +289,7 @@ def generate_tally_xml(df, bank_ledger_name, default_party_ledger):
 # --- 4. HERO SECTION WITH LOGO ---
 # Load logo safely
 try:
-    img_b64 = get_img_as_base64("logo.png")
+    img_b64 = get_img_as_base64("logo 1.png")
 except: img_b64 = None
 
 logo_html = f'<img src="data:image/png;base64,{img_b64}" width="120" style="margin-bottom: 20px;">' if img_b64 else ""
@@ -364,3 +364,4 @@ st.markdown(f"""
         <p style="font-size: 13px; margin-top: 8px;">Powered & Created by <span class="brand-link">Debasish Biswas</span> | Professional Tally Automation</p>
     </div>
 """, unsafe_allow_html=True)
+
