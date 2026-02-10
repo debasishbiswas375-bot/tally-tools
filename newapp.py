@@ -42,8 +42,8 @@ st.markdown(f"""
         /* --- THE LOGO FIX: UPPER LEFT CORNER --- */
         .top-left-logo {{
             position: fixed;
-            left: 10px;
-            top: 10px;
+            left: 30px;
+            top: 5px;
             width: 130px; /* Adjust size as needed */
             z-index: 10001;
         }}
