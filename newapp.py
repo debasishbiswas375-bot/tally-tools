@@ -27,14 +27,14 @@ if 'logged_in' not in st.session_state:
     st.session_state.user_role = None
     st.session_state.show_settings = False
 
-# --- 3. REFINED CSS (FIXING FILE UPLOADER TEXT & NAV BAR) ---
+# --- 3. CSS: PROFILE NAV STYLE & BLACK INTERNAL TEXT ---
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
         
         .stApp { background-color: #0056D2; }
 
-        /* NAVIGATION BAR */
+        /* --- NAVIGATION TABS (PROFILE STYLE) --- */
         .stTabs {
             background-color: #0056D2;
             padding-top: 10px;
@@ -56,18 +56,21 @@ st.markdown("""
             border-radius: 8px 8px 0 0; 
         }
 
-        /* --- VISIBILITY FIX: BLACK TEXT FOR FILE UPLOADER & INPUTS --- */
-        /* This targets the 'Drag and drop file here' text */
+        /* --- VISIBILITY: BLACK TEXT FOR FILE UPLOADER & INPUTS --- */
+        /* Targets 'Drag and drop file here' text inside the white box */
         [data-testid="stFileUploader"] section div div {
             color: #000000 !important;
         }
         
-        /* Text inside selectboxes and inputs */
+        /* Text inside selectboxes and text inputs */
         input, .stTextInput input, .stSelectbox div {
             color: #000000 !important;
             font-weight: 500 !important;
         }
         
+        /* Placeholder visibility */
+        ::placeholder { color: #555555 !important; }
+
         label { color: #FFFFFF !important; font-weight: 600 !important; }
         h1, h2, h3, p, span, .stMarkdown { color: #FFFFFF !important; }
 
@@ -107,7 +110,7 @@ tabs = st.tabs(["Home", "Solutions", "Pricing", "Login", "Register"])
 
 with tabs[0]: # HOME
     if st.session_state.logged_in:
-        # Profile Style Header
+        # Profile Style Header Integration
         p_col1, p_col2 = st.columns([12, 1.5])
         with p_col2:
             if st.button("👤 Profile"):
@@ -119,7 +122,7 @@ with tabs[0]: # HOME
             new_pass = st.text_input("Change Password", type="password")
             if st.button("Save Profile"):
                 idx = st.session_state.users_db[st.session_state.users_db['Username'] == st.session_state.current_user].index[0]
-                # Fix for line 149 syntax
+                # Fixed syntax error for line 149
                 if new_pass:
                     st.session_state.users_db.at[idx, 'Password'] = new_pass
                 st.success("Profile Updated!")
@@ -135,15 +138,16 @@ with tabs[0]: # HOME
                 c1, c2 = st.columns(2, gap="large")
                 with c1:
                     with st.container(border=True):
-                        st.markdown("#### Upload Tally Master")
-                        # The text inside this box is now black for visibility
-                        up_html = st.file_uploader("master.html", type=['html'])
+                        st.markdown("#### 1. Configuration")
+                        # BANK SELECTION (RESTORED)
+                        bank_choice = st.selectbox("Select Bank Format", ["SBI", "HDFC", "ICICI", "Other"])
+                        up_html = st.file_uploader("Upload Master (master.html)", type=['html'])
                         ledgers = get_ledger_names(up_html) if up_html else ["Cash", "Bank"]
                         st.selectbox("Select Bank Ledger", ledgers)
                 with c2:
                     with st.container(border=True):
-                        st.markdown("#### Upload Statement")
-                        st.file_uploader("Bank Statement", type=['pdf', 'xlsx'])
+                        st.markdown("#### 2. Process File")
+                        st.file_uploader("Bank Statement (Excel/PDF)", type=['pdf', 'xlsx'])
                         st.button("🚀 Process & Generate XML")
             else:
                 st.warning("⚠️ Trial Mode: Please contact Admin for Full Access.")
