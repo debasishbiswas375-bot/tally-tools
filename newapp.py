@@ -25,7 +25,7 @@ if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.current_user = None
 
-# --- 3. CLEAN CSS (NO BACKGROUND HERO) ---
+# --- 3. CAELUM-STYLE CSS ---
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
@@ -38,7 +38,7 @@ st.markdown("""
 
         /* --- NAVBAR / TABS STYLING --- */
         .stTabs {
-            background-color: #0044CC; /* Caelum Blue Navbar */
+            background-color: #0044CC; /* Caelum Blue */
             padding-top: 10px;
             padding-bottom: 0px;
             margin-top: -6rem; 
@@ -70,34 +70,32 @@ st.markdown("""
         .stTabs [aria-selected="true"] {
             background-color: transparent !important;
             color: #FFFFFF !important;
-            border-bottom: 4px solid #4ADE80;
+            border-bottom: 4px solid #4ADE80; /* Green Active Indicator */
             font-weight: 700;
         }
 
-        /* --- HERO SECTION (CLEAN - NO BACKGROUND) --- */
+        /* --- HERO SECTION (Text Visibility Fix) --- */
         .hero-section {
-            background-color: transparent; /* Removed Blue Background */
-            padding: 40px 0px 40px 0px;
-            margin-bottom: 20px;
+            background-color: #0044CC; /* Blue Background */
+            padding: 60px 80px 100px 80px;
+            margin: 0 -4rem 30px -4rem;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            border-bottom: 1px solid #E2E8F0; /* Subtle separator */
         }
         
-        /* Title is now Blue to be visible on white */
+        /* FORCE WHITE TEXT */
         .hero-title { 
             font-size: 3.5rem; 
             font-weight: 800; 
             line-height: 1.1; 
             margin-bottom: 20px; 
-            color: #0044CC; 
+            color: #FFFFFF !important; /* White Text */
         }
         
-        /* Subtitle is dark gray */
         .hero-subtitle { 
-            font-size: 1.1rem; 
-            color: #475569; 
+            font-size: 1.2rem; 
+            color: #E0E7FF !important; /* Light Blue/White Text */
             margin-bottom: 30px; 
             max-width: 600px; 
             line-height: 1.6;
@@ -114,7 +112,7 @@ st.markdown("""
         
         /* Buttons */
         div[data-testid="stButton"] button {
-             background-color: #4ADE80; 
+             background-color: #4ADE80; /* Caelum Green */
              color: #0044CC; 
              font-weight: 700;
              border-radius: 50px;
@@ -130,11 +128,11 @@ st.markdown("""
         .login-warning {
             text-align: center;
             padding: 40px;
-            background-color: #FFF1F2; /* Light Red */
-            border: 1px dashed #E11D48;
+            background-color: #EFF6FF;
+            border: 2px dashed #0044CC;
             border-radius: 12px;
             margin-top: 20px;
-            color: #9F1239;
+            color: #1e3a8a;
         }
         
         /* Footer */
@@ -316,7 +314,7 @@ with tabs[0]:
             <div class="login-warning">
                 <h2>🔒 Access Restricted</h2>
                 <p>You must be logged in to use the <b>Accounting Expert Tool</b>.</p>
-                <p>Please go to the <b>User Management</b> tab to Sign In.</p>
+                <p>Please go to the <b>User Management</b> tab to <b>Login</b> or <b>Register</b> for a Free Trial.</p>
             </div>
         """, unsafe_allow_html=True)
 
@@ -324,29 +322,54 @@ with tabs[0]:
 with tabs[1]: st.info("Solutions Page - Coming Soon...")
 with tabs[2]: st.info("Pricing Page - Coming Soon...")
 
-# --- TAB 4: USER MANAGEMENT (LOGIN) ---
+# --- TAB 4: USER MANAGEMENT (LOGIN & REGISTER) ---
 with tabs[3]:
     st.markdown("<br>", unsafe_allow_html=True)
+    
     if not st.session_state.logged_in:
+        # Create Tabs for Login vs Register
+        auth_mode = st.radio("Select Option:", ["Login", "Register for Free Trial"], horizontal=True)
+        st.divider()
+
         c1, c2, c3 = st.columns([1, 1, 1])
         with c2:
             with st.container(border=True):
-                st.markdown("### 🔐 User Login")
-                username = st.text_input("Username")
-                password = st.text_input("Password", type="password")
-                if st.button("Sign In"):
-                    user = st.session_state.users_db[(st.session_state.users_db['Username'] == username) & (st.session_state.users_db['Password'] == password)]
-                    if not user.empty:
-                        st.session_state.logged_in = True
-                        st.session_state.current_user = username
-                        st.rerun()
-                    else: st.error("Invalid credentials")
-                st.caption("Default: admin / 123")
+                if auth_mode == "Login":
+                    st.markdown("### 🔐 Login")
+                    username = st.text_input("Username", key="login_user")
+                    password = st.text_input("Password", type="password", key="login_pass")
+                    if st.button("Sign In"):
+                        user = st.session_state.users_db[(st.session_state.users_db['Username'] == username) & (st.session_state.users_db['Password'] == password)]
+                        if not user.empty:
+                            st.session_state.logged_in = True
+                            st.session_state.current_user = username
+                            st.rerun()
+                        else: st.error("Invalid credentials")
+                    st.caption("Default: admin / 123")
+                
+                else: # REGISTER MODE
+                    st.markdown("### 🚀 Start Free Trial")
+                    new_user = st.text_input("Choose Username", key="reg_user")
+                    new_pass = st.text_input("Choose Password", type="password", key="reg_pass")
+                    
+                    if st.button("Create Account"):
+                        if new_user and new_pass:
+                            # Check if user exists
+                            if new_user in st.session_state.users_db['Username'].values:
+                                st.error("Username already taken.")
+                            else:
+                                new_entry = pd.DataFrame([{"Username": new_user, "Password": new_pass, "Role": "User", "Status": "Active"}])
+                                st.session_state.users_db = pd.concat([st.session_state.users_db, new_entry], ignore_index=True)
+                                st.success("Account Created! Please switch to Login.")
+                        else:
+                            st.warning("Please fill in all fields.")
+
     else:
         st.success(f"Welcome, {st.session_state.current_user}")
         if st.button("Logout"):
             st.session_state.logged_in = False
             st.rerun()
+        
         st.divider()
         st.markdown("### 👥 Admin Dashboard")
         st.dataframe(st.session_state.users_db, use_container_width=True)
