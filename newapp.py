@@ -32,7 +32,7 @@ if 'logged_in' not in st.session_state:
     st.session_state.current_user = None
     st.session_state.user_role = None
 
-# --- 3. CUSTOM CSS (FIXING CONTRAST & VISIBILITY) ---
+# --- 3. CUSTOM CSS ---
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
@@ -171,7 +171,7 @@ with tabs[3]: # ACCOUNT (INTEGRATED LOGIN, REGISTER & PROFILE)
                     st.rerun()
                 else: st.error("Invalid Username or Password.")
         else:
-            # Registration with new required fields
+            # Registration Fields
             r_name = st.text_input("Full Name *")
             r_mob = st.text_input("Mobile Number *")
             r_email = st.text_input("Email ID *")
@@ -180,14 +180,21 @@ with tabs[3]: # ACCOUNT (INTEGRATED LOGIN, REGISTER & PROFILE)
             r_comp = st.text_input("Company Name (Optional)")
             
             if st.button("Create Account"):
+                # Company Name is optional; if skipped, it defaults to N/A
                 if all([r_name, r_mob, r_email, r_user, r_pass]):
                     new_user = {
-                        "Username": r_user, "Password": r_pass, "Role": "Trial", 
-                        "Status": "Free", "Pic": None, "Name": r_name, 
-                        "Mobile": r_mob, "Email": r_email, "Company": r_comp if r_comp else "N/A"
+                        "Username": r_user, 
+                        "Password": r_pass, 
+                        "Role": "Trial", 
+                        "Status": "Free", 
+                        "Pic": None, 
+                        "Name": r_name, 
+                        "Mobile": r_mob, 
+                        "Email": r_email, 
+                        "Company": r_comp if r_comp.strip() else "N/A"
                     }
                     st.session_state.users_db = pd.concat([st.session_state.users_db, pd.DataFrame([new_user])], ignore_index=True)
-                    st.success("✅ Registration Successful! You can now switch to Login.")
+                    st.success("✅ Registration Successful! Please switch to Login.")
                 else:
                     st.error("Please fill in all required (*) fields.")
     
