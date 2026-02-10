@@ -2,7 +2,6 @@ import streamlit as st
 import pandas as pd
 from bs4 import BeautifulSoup
 import io
-from PIL import Image
 
 # --- 1. PAGE CONFIGURATION ---
 st.set_page_config(
@@ -12,20 +11,28 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- 2. SESSION STATE (STABILIZED) ---
+# --- 2. SESSION STATE (USER DATABASE & AUTH) ---
 if 'users_db' not in st.session_state:
+    # Initial database with requested fields
     st.session_state.users_db = pd.DataFrame([
-        {"Username": "admin", "Password": "123", "Role": "Admin", "Status": "Paid", "Pic": None},
-        {"Username": "uday", "Password": "123", "Role": "Trial", "Status": "Free", "Pic": None}
+        {
+            "Username": "admin", "Password": "123", "Role": "Admin", 
+            "Status": "Paid", "Pic": None, "Name": "Admin User", 
+            "Mobile": "0000000000", "Email": "admin@example.com", "Company": "Master Corp"
+        },
+        {
+            "Username": "uday", "Password": "123", "Role": "Trial", 
+            "Status": "Free", "Pic": None, "Name": "Uday Mondal", 
+            "Mobile": "9876543210", "Email": "uday@example.com", "Company": "N/A"
+        }
     ])
 
 if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.current_user = None
     st.session_state.user_role = None
-    st.session_state.show_profile = False
 
-# --- 3. CUSTOM CSS ---
+# --- 3. CUSTOM CSS (FIXING CONTRAST & VISIBILITY) ---
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
@@ -36,29 +43,25 @@ st.markdown("""
         .stTabs [data-baseweb="tab"] { color: #FFFFFF !important; font-weight: 600; }
         .stTabs [aria-selected="true"] { background-color: #FFFFFF !important; color: #0056D2 !important; border-radius: 8px 8px 0 0; }
 
-        /* INPUT VISIBILITY */
+        /* INPUT VISIBILITY (FORCING BLACK TEXT) */
         input, .stSelectbox div, [data-testid="stFileUploader"] * { color: #000000 !important; }
         label { color: #FFFFFF !important; font-weight: 600 !important; }
         h1, h2, h3, p, .stMarkdown { color: #FFFFFF !important; }
 
-        /* PRICING CARDS FIX */
+        /* PRICING CARDS - HIGH CONTRAST FIX */
         .price-card {
             background-color: #FFFFFF;
-            padding: 20px;
+            padding: 25px;
             border-radius: 15px;
             color: #1E293B !important;
-            min-height: 200px;
-            border-top: 5px solid #66E035;
+            min-height: 250px;
+            border-top: 8px solid #66E035;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.2);
         }
-        .price-card h4, .price-card li, .price-card b { color: #1E293B !important; }
-
-        /* PROFILE STYLING */
-        .profile-box {
-            background: rgba(255, 255, 255, 0.1);
-            padding: 20px;
-            border-radius: 15px;
-            border: 1px solid rgba(255, 255, 255, 0.2);
-        }
+        .price-card h4 { color: #0056D2 !important; font-weight: 800; margin-bottom: 15px; }
+        .price-card ul { color: #1E293B !important; list-style-type: none; padding-left: 0; }
+        .price-card li { margin-bottom: 10px; font-weight: 500; }
+        .price-card b { color: #0056D2; font-size: 1.2em; }
 
         /* BUTTONS */
         div.stButton > button {
@@ -66,6 +69,7 @@ st.markdown("""
             color: #0056D2 !important;
             border-radius: 50px !important;
             font-weight: 700 !important;
+            border: none !important;
         }
 
         header {visibility: hidden;}
@@ -92,94 +96,131 @@ tabs = st.tabs(["Home", "Solutions", "Pricing", "Account"])
 with tabs[0]: # HOME
     if st.session_state.logged_in:
         st.markdown(f"<h1>Welcome back, {st.session_state.current_user}!</h1>", unsafe_allow_html=True)
-        
         if st.session_state.user_role == "Admin":
             st.markdown("### 🛠️ Converter Tool (Full Access)")
             col1, col2 = st.columns(2, gap="large")
             with col1:
                 with st.container(border=True):
                     st.markdown("#### 1. Settings")
-                    st.selectbox("Select Bank Format", ["SBI", "HDFC", "ICICI"])
-                    up_html = st.file_uploader("Upload Tally Master", type=['html'])
+                    st.selectbox("Select Bank Format", ["SBI", "HDFC", "ICICI", "Other"])
+                    up_html = st.file_uploader("Upload Tally Master (master.html)", type=['html'])
                     ledgers = get_ledger_names(up_html) if up_html else ["Cash", "Bank"]
                     st.selectbox("Select Bank Ledger", ledgers)
             with col2:
                 with st.container(border=True):
                     st.markdown("#### 2. Process")
-                    st.file_uploader("Drop Statement", type=['pdf', 'xlsx'])
-                    st.button("🚀 Process & Generate XML")
+                    st.file_uploader("Drop Bank Statement here", type=['pdf', 'xlsx'])
+                    if st.button("🚀 Process & Generate XML"):
+                        st.success("✅ Conversion Process Started!")
         else:
-            st.warning("⚠️ Trial Mode: Please contact Admin for Full Access.")
+            st.warning("⚠️ Trial Mode: Please contact Admin to upgrade to a Paid account for XML Export.")
     else:
         st.markdown('<h1>Perfecting the Science of Data Extraction</h1>', unsafe_allow_html=True)
-        st.info("👋 Please go to the **Account** tab to Sign In or Register.")
+        st.info("👋 Welcome! Please visit the **Account** tab to Sign In or Register.")
 
 with tabs[1]: # SOLUTIONS
     st.markdown("## 🚀 Our Solutions")
-    st.write("- Bank Statement to Tally XML Converter")
-    st.write("- Auto-ledger mapping via HTML Master files")
+    st.markdown("""
+    * **Bank to Tally XML:** Convert any PDF/Excel statement into Tally-ready format.
+    * **Auto-Ledger Mapping:** Fetch ledgers directly from your Tally HTML masters.
+    * **High Security:** Processing happens locally in your session.
+    """)
 
 with tabs[2]: # PRICING
-    st.markdown("## 💰 Plans")
+    st.markdown("## 💰 Plans & Pricing")
     p1, p2 = st.columns(2)
     with p1:
-        st.markdown('<div class="price-card"><h4>Free Plan</h4><ul><li>Unlimited Previews</li><li>No XML Export</li></ul><b>Price: ₹0</b></div>', unsafe_allow_html=True)
+        st.markdown("""
+            <div class="price-card" style="border-top-color: #CBD5E1;">
+                <h4>Trial Plan</h4>
+                <ul>
+                    <li>✅ Unlimited Previews</li>
+                    <li>❌ Restricted XML Export</li>
+                    <li>✅ Standard Support</li>
+                </ul>
+                <b>Price: Free</b>
+            </div>
+        """, unsafe_allow_html=True)
     with p2:
-        st.markdown('<div class="price-card"><h4>Paid Plan</h4><ul><li>Full XML Export</li><li>Priority Support</li></ul><b>Contact for Price</b></div>', unsafe_allow_html=True)
+        st.markdown("""
+            <div class="price-card">
+                <h4>Professional Plan</h4>
+                <ul>
+                    <li>✅ Full XML Export</li>
+                    <li>✅ All Bank Formats Supported</li>
+                    <li>✅ Priority Admin Support</li>
+                </ul>
+                <b>Contact Admin for Pricing</b>
+            </div>
+        """, unsafe_allow_html=True)
 
-with tabs[3]: # ACCOUNT (INTEGRATED LOGIN/REGISTER/PROFILE)
+with tabs[3]: # ACCOUNT (INTEGRATED LOGIN, REGISTER & PROFILE)
     if not st.session_state.logged_in:
-        choice = st.radio("Choose Action", ["Login", "Register"], horizontal=True)
+        mode = st.radio("Select Action", ["Login", "Register"], horizontal=True)
         
-        if choice == "Login":
-            u = st.text_input("Username")
-            p = st.text_input("Password", type="password")
+        if mode == "Login":
+            u_input = st.text_input("Username", key="login_u")
+            p_input = st.text_input("Password", type="password", key="login_p")
             if st.button("Sign In"):
                 db = st.session_state.users_db
-                user = db[(db['Username'] == u) & (db['Password'] == p)]
-                if not user.empty:
+                match = db[(db['Username'] == u_input) & (db['Password'] == p_input)]
+                if not match.empty:
                     st.session_state.logged_in = True
-                    st.session_state.current_user = u
-                    st.session_state.user_role = user.iloc[0]['Role']
+                    st.session_state.current_user = u_input
+                    st.session_state.user_role = match.iloc[0]['Role']
                     st.rerun()
-                else: st.error("Invalid credentials")
+                else: st.error("Invalid Username or Password.")
         else:
-            new_u = st.text_input("New Username")
-            new_p = st.text_input("New Password", type="password")
+            # Registration with new required fields
+            r_name = st.text_input("Full Name *")
+            r_mob = st.text_input("Mobile Number *")
+            r_email = st.text_input("Email ID *")
+            r_user = st.text_input("Choose Username *")
+            r_pass = st.text_input("Choose Password *", type="password")
+            r_comp = st.text_input("Company Name (Optional)")
+            
             if st.button("Create Account"):
-                new_data = {"Username": new_u, "Password": new_p, "Role": "Trial", "Status": "Free", "Pic": None}
-                st.session_state.users_db = pd.concat([st.session_state.users_db, pd.DataFrame([new_data])], ignore_index=True)
-                st.success("Account Created! You can now login.")
+                if all([r_name, r_mob, r_email, r_user, r_pass]):
+                    new_user = {
+                        "Username": r_user, "Password": r_pass, "Role": "Trial", 
+                        "Status": "Free", "Pic": None, "Name": r_name, 
+                        "Mobile": r_mob, "Email": r_email, "Company": r_comp if r_comp else "N/A"
+                    }
+                    st.session_state.users_db = pd.concat([st.session_state.users_db, pd.DataFrame([new_user])], ignore_index=True)
+                    st.success("✅ Registration Successful! You can now switch to Login.")
+                else:
+                    st.error("Please fill in all required (*) fields.")
     
     else:
-        # PROFILE SECTION
+        # PROFILE VIEW
         st.markdown("## 👤 Your Profile")
-        user_idx = st.session_state.users_db[st.session_state.users_db['Username'] == st.session_state.current_user].index[0]
-        user_data = st.session_state.users_db.iloc[user_idx]
+        idx = st.session_state.users_db[st.session_state.users_db['Username'] == st.session_state.current_user].index[0]
+        data = st.session_state.users_db.iloc[idx]
 
-        with st.container():
-            col_img, col_info = st.columns([1, 3])
+        c_img, c_info = st.columns([1, 2])
+        with c_img:
+            if data['Pic'] is not None:
+                st.image(data['Pic'], width=200)
+            else:
+                st.info("No profile picture.")
             
-            with col_img:
-                if user_data['Pic'] is not None:
-                    st.image(user_data['Pic'], width=150)
-                else:
-                    st.write("No Profile Picture")
-                
-                new_pic = st.file_uploader("Update Picture", type=['png', 'jpg', 'jpeg'])
-                if new_pic:
-                    st.session_state.users_db.at[user_idx, 'Pic'] = new_pic
-                    st.rerun()
+            new_photo = st.file_uploader("Update Profile Photo", type=['jpg', 'png', 'jpeg'])
+            if new_photo:
+                st.session_state.users_db.at[idx, 'Pic'] = new_photo
+                st.rerun()
 
-            with col_info:
-                st.markdown(f"### {user_data['Username']}")
-                status_color = "#66E035" if user_data['Status'] == "Paid" else "#FF4B4B"
-                st.markdown(f"**Subscription Status:** <span style='color:{status_color}; font-weight:bold;'>{user_data['Status']} User</span>", unsafe_allow_html=True)
-                st.markdown(f"**Role:** {user_data['Role']}")
-                
-                if st.button("Logout"):
-                    st.session_state.logged_in = False
-                    st.rerun()
+        with c_info:
+            st.markdown(f"### {data['Name']}")
+            status_color = "#66E035" if data['Status'] == "Paid" else "#FF4B4B"
+            st.markdown(f"**Subscription Status:** <span style='color:{status_color}; font-weight:bold;'>{data['Status']} User</span>", unsafe_allow_html=True)
+            st.write(f"**Username:** {data['Username']}")
+            st.write(f"**Email:** {data['Email']}")
+            st.write(f"**Mobile:** {data['Mobile']}")
+            st.write(f"**Company:** {data['Company']}")
+            
+            if st.button("Sign Out"):
+                st.session_state.logged_in = False
+                st.rerun()
 
 # --- 6. FOOTER ---
 st.markdown("""
