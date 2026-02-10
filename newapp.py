@@ -298,6 +298,7 @@ with st.container(border=True):
 st.markdown("""
     <div class="footer">
         <p>Powered & Created by <b>Debasish.biswas</b> | Professional Tally Automation</p>
+        <p>Sponsored by <b>Uday Mondal</b> | Consultant Advocate</p> 
     </div>
 # Footer
 
