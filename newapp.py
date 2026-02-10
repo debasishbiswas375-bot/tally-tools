@@ -84,14 +84,21 @@ st.markdown("""
             justify-content: space-between;
         }
         
+        /* FORCE WHITE TEXT FOR HERO */
         .hero-title { 
-            font-size: 3.5rem; font-weight: 800; line-height: 1.1; 
-            margin-bottom: 20px; color: #FFFFFF !important;
+            font-size: 3.5rem; 
+            font-weight: 800; 
+            line-height: 1.1; 
+            margin-bottom: 20px; 
+            color: #FFFFFF !important;
         }
         
         .hero-subtitle { 
-            font-size: 1.2rem; color: #E0E7FF !important; 
-            margin-bottom: 30px; max-width: 600px; line-height: 1.6;
+            font-size: 1.2rem; 
+            color: #E0E7FF !important;
+            margin-bottom: 30px; 
+            max-width: 600px; 
+            line-height: 1.6;
         }
         
         /* CARD STYLING */
@@ -106,11 +113,15 @@ st.markdown("""
         /* Buttons */
         div[data-testid="stButton"] button {
              background-color: #4ADE80; /* Caelum Green */
-             color: #0044CC; font-weight: 700;
-             border-radius: 50px; border: none; padding: 10px 25px;
+             color: #0044CC; 
+             font-weight: 700;
+             border-radius: 50px;
+             border: none;
+             padding: 10px 25px;
         }
         div[data-testid="stButton"] button:hover {
-             background-color: #22c55e; color: white;
+             background-color: #22c55e;
+             color: white;
         }
 
         /* Footer */
@@ -279,7 +290,7 @@ tabs = st.tabs(["Home", "Solutions", "Pricing", "User Management"])
 
 # --- TAB 1: HOME ---
 with tabs[0]:
-    # Hero Section with Logo
+    # Hero Section with Logo (using logo.png)
     try: hero_logo_b64 = get_img_as_base64("logo.png")
     except: hero_logo_b64 = None
     hero_img_html = f'<img src="data:image/png;base64,{hero_logo_b64}" style="max-width: 100%; animation: float 6s ease-in-out infinite;">' if hero_logo_b64 else ""
@@ -366,53 +377,4 @@ with tabs[0]:
                 
                 if auth_mode == "Login":
                     u = st.text_input("Username", key="home_login_u")
-                    p = st.text_input("Password", type="password", key="home_login_p")
-                    if st.button("Access Dashboard"):
-                        user = st.session_state.users_db[(st.session_state.users_db['Username'] == u) & (st.session_state.users_db['Password'] == p)]
-                        if not user.empty:
-                            st.session_state.logged_in = True
-                            st.session_state.current_user = u
-                            st.rerun()
-                        else: st.error("Incorrect username or password.")
-                else:
-                    new_u = st.text_input("Create Username", key="home_reg_u")
-                    new_p = st.text_input("Create Password", type="password", key="home_reg_p")
-                    if st.button("Start Free Trial"):
-                        if new_u and new_p:
-                             if new_u in st.session_state.users_db['Username'].values:
-                                st.error("User already exists.")
-                             else:
-                                new_entry = pd.DataFrame([{"Username": new_u, "Password": new_p, "Role": "User", "Status": "Active"}])
-                                st.session_state.users_db = pd.concat([st.session_state.users_db, new_entry], ignore_index=True)
-                                st.success("Account Created! You can now Login.")
-                        else: st.warning("Please fill details.")
-
-# --- TAB 2 & 3: PLACEHOLDERS ---
-with tabs[1]: st.info("Solutions Page - Coming Soon...")
-with tabs[2]: st.info("Pricing Page - Coming Soon...")
-
-# --- TAB 4: USER MANAGEMENT ---
-with tabs[3]:
-    st.markdown("<br>", unsafe_allow_html=True)
-    if st.session_state.logged_in:
-        st.success(f"Logged in as: {st.session_state.current_user}")
-        if st.button("Logout"):
-            st.session_state.logged_in = False
-            st.rerun()
-        st.divider()
-        st.markdown("### 👥 User Database (Admin View)")
-        st.dataframe(st.session_state.users_db, use_container_width=True)
-    else:
-        st.warning("Please Login from the Home Page first.")
-
-# --- FOOTER ---
-try: footer_logo_b64 = get_img_as_base64("logo 1.png")
-except: footer_logo_b64 = None
-footer_html = f'<img src="data:image/png;base64,{footer_logo_b64}" width="25">' if footer_logo_b64 else ""
-
-st.markdown(f"""
-    <div class="footer">
-        <p>Sponsored By {footer_html} <span style="color:#0044CC; font-weight:700">Uday Mondal</span> | Consultant Advocate</p>
-        <p style="font-size: 13px;">Powered & Created by <span style="color:#0044CC; font-weight:700">Debasish Biswas</span></p>
-    </div>
-""", unsafe_allow_html=True)
+                    p = st.text_input("Password", type="password", key="home_login_
