@@ -16,7 +16,6 @@ st.set_page_config(
 )
 
 # --- 2. SESSION STATE (DATABASE & LOGIN) ---
-# This acts as your database for now.
 if 'users_db' not in st.session_state:
     st.session_state.users_db = pd.DataFrame([
         {"Username": "admin", "Password": "123", "Role": "Admin", "Status": "Active"},
@@ -116,6 +115,23 @@ def get_img_as_base64(file):
         return base64.b64encode(data).decode()
     except: return None
 
+def get_ledger_names(html_file):
+    try:
+        soup = BeautifulSoup(html_file, 'html.parser')
+        ledgers = []
+        rows = soup.find_all('tr')
+        for row in rows:
+            cols = row.find_all('td')
+            if cols:
+                text = cols[0].get_text(strip=True)
+                if text: ledgers.append(text)
+        if not ledgers:
+            all_text = soup.get_text(separator='\n')
+            lines = [line.strip() for line in all_text.split('\n') if line.strip()]
+            ledgers = sorted(list(set(lines)))
+        return sorted(ledgers)
+    except: return []
+
 def clean_currency(value):
     if pd.isna(value) or value == '': return 0.0
     val_str = str(value).replace(',', '').strip()
@@ -124,7 +140,6 @@ def clean_currency(value):
 
 def load_bank_file(file, password=None):
     if file.name.lower().endswith('.pdf'):
-        # PDF Logic embedded directly here for brevity
         all_rows = []
         try:
             with pdfplumber.open(file, password=password) as pdf:
@@ -136,7 +151,6 @@ def load_bank_file(file, password=None):
                             if any(cleaned): all_rows.append(cleaned)
             if not all_rows: return None
             df = pd.DataFrame(all_rows)
-            # Simple Header Search
             header_idx = 0
             for i, row in df.iterrows():
                 row_str = row.astype(str).str.lower().values
@@ -157,12 +171,16 @@ def normalize_bank_data(df, bank_name):
         'ICICI': {'Value Date': 'Date', 'Transaction Remarks': 'Narration', 'Withdrawal Amount (INR )': 'Debit', 'Deposit Amount (INR )': 'Credit'},
         'HDFC Bank': {'Date': 'Date', 'Narration': 'Narration', 'Withdrawal Amt.': 'Debit', 'Deposit Amt.': 'Credit'},
         'Axis Bank': {'Tran Date': 'Date', 'Particulars': 'Narration', 'Debit': 'Debit', 'Credit': 'Credit'},
+        'Kotak Mahindra': {'Transaction Date': 'Date', 'Transaction Details': 'Narration', 'Withdrawal Amount': 'Debit', 'Deposit Amount': 'Credit'},
+        'Yes Bank': {'Value Date': 'Date', 'Description': 'Narration', 'Debit Amount': 'Debit', 'Credit Amount': 'Credit'},
+        'Indian Bank': {'Value Date': 'Date', 'Narration': 'Narration', 'Debit': 'Debit', 'Credit': 'Credit'},
+        'India Post (IPPB)': {'Date': 'Date', 'Remarks': 'Narration', 'Debit Amount': 'Debit', 'Credit Amount': 'Credit'},
+        'RBL Bank': {'Transaction Date': 'Date', 'Transaction Description': 'Narration', 'Withdrawal Amount': 'Debit', 'Deposit Amount': 'Credit'}
     }
-    # Basic mapping logic
+    
     if bank_name in mappings:
         df = df.rename(columns=mappings[bank_name])
     
-    # Ensure columns exist
     for col in target_columns:
         if col not in df.columns: df[col] = 0 if col in ['Debit', 'Credit'] else ""
             
@@ -187,7 +205,6 @@ def generate_tally_xml(df, bank_ledger_name, default_party_ledger):
     return f"<ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>Vouchers</REPORTNAME></REQUESTDESC><REQUESTDATA>{xml_body}</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>"
 
 # --- 5. MAIN NAVIGATION (Active Tabs) ---
-# This creates the functional Top Bar
 tabs = st.tabs(["🏠 Home", "🛠️ User Management", "💎 Pricing"])
 
 # --- TAB 1: HOME (THE CONVERTER) ---
@@ -213,14 +230,25 @@ with tabs[0]:
     with col_left:
         with st.container(border=True):
             st.markdown("### 1. Settings")
-            bank_ledger = st.text_input("Bank Ledger Name", value="Bank")
-            party_ledger = st.text_input("Default Party/Suspense", value="Suspense A/c")
+            
+            # --- RESTORED MASTER UPLOAD FEATURE ---
+            uploaded_html = st.file_uploader("Upload Tally Master (Optional)", type=['html', 'htm'], help="Upload 'List of Accounts.html' exported from Tally to auto-fill ledger names.")
+            
+            ledger_list = ["Suspense A/c", "Cash", "Bank"]
+            if uploaded_html:
+                extracted = get_ledger_names(uploaded_html)
+                if extracted:
+                    ledger_list = extracted
+                    st.success(f"✅ Synced {len(ledger_list)} ledgers")
+            
+            bank_ledger = st.selectbox("Select Bank Ledger", ledger_list, index=0)
+            party_ledger = st.selectbox("Select Default Party", ledger_list, index=0)
 
     with col_right:
         with st.container(border=True):
             st.markdown("### 2. Upload & Convert")
             c1, c2 = st.columns([1.5, 1])
-            with c1: bank_choice = st.selectbox("Bank Format", ["SBI", "PNB", "ICICI", "Axis Bank", "HDFC Bank", "Other"])
+            with c1: bank_choice = st.selectbox("Bank Format", ["SBI", "PNB", "ICICI", "Axis Bank", "HDFC Bank", "Kotak Mahindra", "Yes Bank", "Indian Bank", "India Post (IPPB)", "RBL Bank", "Other"])
             with c2: pdf_pass = st.text_input("PDF Password", type="password")
 
             uploaded_file = st.file_uploader("Upload Statement", type=['xlsx', 'xls', 'pdf'])
@@ -241,7 +269,7 @@ with tabs[0]:
 
 # --- TAB 2: USER MANAGEMENT (LOGIN & ADMIN) ---
 with tabs[1]:
-    st.markdown("<br>", unsafe_allow_html=True) # Spacer
+    st.markdown("<br>", unsafe_allow_html=True)
     
     if not st.session_state.logged_in:
         # LOGIN SCREEN
