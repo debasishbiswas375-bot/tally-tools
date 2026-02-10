@@ -4,7 +4,6 @@ from bs4 import BeautifulSoup
 import pdfplumber
 import base64
 import io
-from PIL import Image
 
 # --- 1. PAGE CONFIGURATION ---
 st.set_page_config(
@@ -14,7 +13,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- 2. SESSION STATE (FIXED: Includes 'Pic' and 'user_role') ---
+# --- 2. SESSION STATE (STABILIZED) ---
 if 'users_db' not in st.session_state:
     st.session_state.users_db = pd.DataFrame([
         {"Username": "admin", "Password": "123", "Role": "Admin", "Pic": None},
@@ -27,55 +26,41 @@ if 'logged_in' not in st.session_state:
     st.session_state.user_role = None
     st.session_state.show_settings = False
 
-# --- 3. REFINED CSS: PROFILE NAV & BLACK INTERNAL TEXT ---
+# --- 3. THE "CSS HAMMER" (FORCING BLACK TEXT & PROFILE NAV) ---
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
         
         .stApp { background-color: #0056D2; }
 
-        /* --- NAVIGATION TABS (PROFILE STYLE) --- */
+        /* --- NAVIGATION TABS --- */
         .stTabs {
             background-color: #0056D2;
             padding-top: 10px;
             z-index: 1000;
             border-bottom: 1px solid rgba(255,255,255,0.2);
         }
-        
         .stTabs [data-baseweb="tab-list"] { gap: 15px; justify-content: flex-end; padding-right: 20px; }
-        .stTabs [data-baseweb="tab"] { 
-            color: #FFFFFF !important; 
-            font-weight: 600; 
-            font-size: 1rem;
-            border-bottom: none !important;
+        .stTabs [data-baseweb="tab"] { color: #FFFFFF !important; font-weight: 600; border: none !important; }
+        .stTabs [aria-selected="true"] { background-color: #FFFFFF !important; color: #0056D2 !important; border-radius: 8px 8px 0 0; }
+
+        /* --- CRITICAL VISIBILITY FIX: BLACK TEXT IN ALL UPLOADERS --- */
+        /* This forces EVERY piece of text inside the upload box to be Black */
+        [data-testid="stFileUploader"] * {
+            color: #000000 !important;
         }
         
-        .stTabs [aria-selected="true"] { 
-            background-color: #FFFFFF !important; 
-            color: #0056D2 !important; 
-            border-radius: 8px 8px 0 0; 
-        }
-
-        /* --- CRITICAL VISIBILITY FIX: BLACK TEXT FOR UPLOADER --- */
-        /* Targets 'Drag and drop file here' and sub-text inside white boxes */
-        [data-testid="stFileUploader"] section div div {
+        /* Specifically target the 'Drag and drop' area for extra strength */
+        [data-testid="stFileUploaderDropzone"] div {
             color: #000000 !important;
             font-weight: 600 !important;
         }
-        
-        /* Forces 'Browse files' button text color */
-        [data-testid="stFileUploader"] button p {
-            color: #000000 !important;
-        }
-        
-        /* Forces all dropdown and input text to black for readability */
-        input, .stTextInput input, .stSelectbox div {
+
+        /* Forces all selectboxes and input fields to have black text */
+        input, .stTextInput input, .stSelectbox div, .stSelectbox span {
             color: #000000 !important;
             font-weight: 500 !important;
         }
-        
-        /* Placeholder visibility */
-        ::placeholder { color: #555555 !important; opacity: 1; }
 
         label { color: #FFFFFF !important; font-weight: 600 !important; }
         h1, h2, h3, p, span, .stMarkdown { color: #FFFFFF !important; }
@@ -88,13 +73,12 @@ st.markdown("""
         }
         .footer p, .footer b { color: #1E293B !important; margin: 0; }
 
-        /* SUCCESS BUTTONS */
+        /* BUTTONS */
         div.stButton > button {
             background-color: #66E035 !important;
             color: #0056D2 !important;
             border-radius: 50px !important;
             font-weight: 700 !important;
-            border: none !important;
         }
 
         header {visibility: hidden;}
@@ -103,7 +87,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 4. LOGIC FUNCTIONS ---
+# --- 4. LOGIC ---
 def get_ledger_names(html_file):
     try:
         soup = BeautifulSoup(html_file, 'html.parser')
@@ -116,7 +100,7 @@ tabs = st.tabs(["Home", "Solutions", "Pricing", "Login", "Register"])
 
 with tabs[0]: # HOME
     if st.session_state.logged_in:
-        # Profile Style Header Integration
+        # Profile Button in Top Right
         p_col1, p_col2 = st.columns([12, 1.5])
         with p_col2:
             if st.button("👤 Profile"):
@@ -128,7 +112,7 @@ with tabs[0]: # HOME
             new_pass = st.text_input("Change Password", type="password")
             if st.button("Save Profile"):
                 idx = st.session_state.users_db[st.session_state.users_db['Username'] == st.session_state.current_user].index[0]
-                # --- FIXED SYNTAX ERROR: Resolved missing parenthesis from image_01d678.png ---
+                # --- FIXED SYNTAX ERROR: Resolved line 149 ---
                 if new_pass:
                     st.session_state.users_db.at[idx, 'Password'] = new_pass
                 st.success("Profile Updated!")
@@ -145,28 +129,28 @@ with tabs[0]: # HOME
                 with col1:
                     with st.container(border=True):
                         st.markdown("#### 🛠️ 1. Settings & Mapping")
-                        # Restored bank choice and uploader logic
-                        bank_choice = st.selectbox("Select Bank Format", ["SBI", "HDFC", "ICICI", "Other"])
+                        st.selectbox("Select Bank Format", ["SBI", "HDFC", "ICICI", "Other"])
+                        # Uploader text is now FORCED to Black
                         up_html = st.file_uploader("Upload Tally Master (master.html)", type=['html'])
-                        ledgers = get_ledger_names(up_html) if up_html else ["Cash", "Bank", "Suspense A/c"]
+                        ledgers = get_ledger_names(up_html) if up_html else ["Cash", "Bank"]
                         st.selectbox("Select Bank Ledger", ledgers)
                         st.selectbox("Select Default Party", ledgers)
                 with col2:
                     with st.container(border=True):
                         st.markdown("#### 📂 2. Upload & Convert")
-                        # Visibility for 'Drag and drop' is now forced to black
+                        # Uploader text is now FORCED to Black
                         st.file_uploader("Drop your Bank Statement here", type=['pdf', 'xlsx'])
                         st.button("🚀 Process & Generate XML")
             else:
                 st.warning("⚠️ Trial Mode: Please contact Admin for Full Access.")
     else:
         st.markdown('<h1>Perfecting the Science of Data Extraction</h1>', unsafe_allow_html=True)
-        st.info("👋 Use the Login or Register tabs to begin.")
+        st.info("👋 Use the Login tab to begin.")
 
 with tabs[3]: # LOGIN
     st.markdown("## 🔐 Sign In")
-    l_u = st.text_input("Username", key="l_u", placeholder="Enter username")
-    l_p = st.text_input("Password", type="password", key="l_p", placeholder="Enter password")
+    l_u = st.text_input("Username", key="l_u")
+    l_p = st.text_input("Password", type="password", key="l_p")
     if st.button("Sign In"):
         db = st.session_state.users_db
         user_match = db[(db['Username'] == l_u) & (db['Password'] == l_p)]
@@ -177,7 +161,7 @@ with tabs[3]: # LOGIN
             st.rerun()
         else: st.error("Invalid credentials.")
 
-# --- 6. PINNED GLOBAL FOOTER ---
+# --- 6. FOOTER ---
 st.markdown(f"""
     <div class="footer">
         <p>Sponsored By <b>Uday Mondal</b> | Powered & Created by <b>Debasish Biswas</b></p>
