@@ -335,9 +335,9 @@ else:
 
 st.markdown(f"""
     <div class="footer">
-        <p>Powered & Created by <b class="brand-text">Debasish Biswas</b> | Professional Tally Automation</p>
         <p style="font-size: 16px; margin-top: 5px;">
             Sponsored By {logo_html}<b class="brand-text">Uday Mondal</b> | Consultant Advocate
         </p>
+        <p>Powered & Created by <b class="brand-text">Debasish Biswas</b> | Professional Tally Automation</p>
     </div>
 """, unsafe_allow_html=True)
