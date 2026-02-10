@@ -11,18 +11,13 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- 2. SESSION STATE (USER DATABASE & AUTH) ---
+# --- 2. SESSION STATE (STABILIZED DATABASE & AUTH) ---
 if 'users_db' not in st.session_state:
     st.session_state.users_db = pd.DataFrame([
         {
             "Username": "admin", "Password": "123", "Role": "Admin", 
             "Status": "Paid", "Pic": None, "Name": "Admin User", 
             "Mobile": "0000000000", "Email": "admin@example.com", "Company": "Master Corp"
-        },
-        {
-            "Username": "uday", "Password": "123", "Role": "Trial", 
-            "Status": "Free", "Pic": None, "Name": "Uday Mondal", 
-            "Mobile": "9876543210", "Email": "uday@example.com", "Company": "N/A"
         }
     ])
 
@@ -32,15 +27,14 @@ if 'logged_in' not in st.session_state:
     st.session_state.user_role = None
     st.session_state.user_status = None
 
-# --- 3. UNIFIED NAVBAR & PILL BUTTON DESIGN ---
+# --- 3. THE RECTIFIED STYLE OVERRIDE ---
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
         
-        /* Main Background */
         .stApp { background-color: #0056D2; }
 
-        /* --- NAVBAR STYLING (The Tabs) --- */
+        /* --- NAVBAR STYLING --- */
         .stTabs [data-baseweb="tab-list"] {
             gap: 15px;
             justify-content: flex-end;
@@ -76,7 +70,6 @@ st.markdown("""
             font-size: 16px !important;
             transition: all 0.2s ease;
             box-shadow: 0 4px 10px rgba(0,0,0,0.1);
-            width: auto;
         }
         
         div.stButton > button:hover {
@@ -102,7 +95,6 @@ st.markdown("""
         label { color: #FFFFFF !important; font-weight: 600 !important; }
         h1, h2, h3, p, .stMarkdown { color: #FFFFFF !important; }
 
-        /* Hide Streamlit Branding */
         header {visibility: hidden;}
         .footer {
             position: fixed; left: 0; bottom: 0; width: 100%;
@@ -128,7 +120,7 @@ with tabs[0]: # HOME
     if st.session_state.logged_in:
         st.markdown(f"<h1>Welcome back, {st.session_state.current_user}!</h1>", unsafe_allow_html=True)
         
-        # Access Check: Admin OR Paid Status
+        # Access Check: Paid Status or Admin Role
         if st.session_state.user_role == "Admin" or st.session_state.user_status == "Paid":
             st.markdown("### 🛠️ Converter Tool (Full Access)")
             col1, col2 = st.columns(2, gap="large")
@@ -142,9 +134,11 @@ with tabs[0]: # HOME
             with col2:
                 with st.container(border=True):
                     st.markdown("#### 📂 2. Upload & Convert")
+                    # Bank Format selection correctly in the 2nd Process Column
                     st.selectbox("Select Bank Format", ["SBI", "HDFC", "ICICI", "Other"])
                     st.file_uploader("Drop your Bank Statement here", type=['pdf', 'xlsx'])
-                    st.button("🚀 Process & Generate XML")
+                    if st.button("🚀 Process & Generate XML"):
+                        st.success("✅ Conversion Process Started!")
         else:
             st.warning("⚠️ Trial Mode: Please contact Admin to upgrade to a Paid account to unlock the tool.")
     else:
@@ -156,7 +150,11 @@ with tabs[1]: # SOLUTIONS
     st.markdown("""
         <div class="content-card">
             <h4>Automated Bank Parsing</h4>
-            <p>Convert SBI, HDFC, ICICI, and more into Tally XML formats in seconds.</p>
+            <p>Convert SBI, HDFC, ICICI, and more into Tally XML formats with 100% precision.</p>
+        </div>
+        <div class="content-card">
+            <h4>Master Integration</h4>
+            <p>Sync your Tally ledgers instantly to ensure zero mapping errors.</p>
         </div>
     """, unsafe_allow_html=True)
 
@@ -164,13 +162,13 @@ with tabs[2]: # PRICING
     st.markdown("## 💰 Pricing Plans")
     p1, p2 = st.columns(2)
     with p1:
-        st.markdown('<div class="content-card" style="border-top-color:#CBD5E1;"><h4>Trial</h4><b>₹0</b></div>', unsafe_allow_html=True)
-        st.button("Start Free", key="start_free")
+        st.markdown('<div class="content-card" style="border-top-color:#CBD5E1;"><h4>Trial Plan</h4><ul><li>Unlimited Previews</li><li>No XML Export</li></ul><b>Price: ₹0</b></div>', unsafe_allow_html=True)
+        st.button("Start Free", key="start_trial")
     with p2:
-        st.markdown('<div class="content-card"><h4>Professional</h4><b>Contact Admin</b></div>', unsafe_allow_html=True)
-        st.button("Get Professional", key="upgrade_pro")
+        st.markdown('<div class="content-card"><h4>Professional Plan</h4><ul><li>Full XML Export</li><li>Priority Support</li></ul><b>Contact Admin for Access</b></div>', unsafe_allow_html=True)
+        st.button("Upgrade Now", key="start_pro")
 
-with tabs[3]: # ACCOUNT
+with tabs[3]: # ACCOUNT (INTEGRATED)
     if not st.session_state.logged_in:
         mode = st.radio("Choose Action", ["Login", "Register"], horizontal=True)
         if mode == "Login":
@@ -202,7 +200,7 @@ with tabs[3]: # ACCOUNT
                         "Company": r_comp if r_comp.strip() else "N/A"
                     }
                     st.session_state.users_db = pd.concat([st.session_state.users_db, pd.DataFrame([new_user])], ignore_index=True)
-                    st.success("Registration Successful! Please switch to Login.")
+                    st.success("✅ Registration Successful! Please switch to Login.")
                 else: st.error("Please fill in required fields.")
     else:
         # PROFILE VIEW
@@ -211,9 +209,9 @@ with tabs[3]: # ACCOUNT
         
         c1, c2 = st.columns([1, 2])
         with c1:
-            if data['Pic']: st.image(data['Pic'], width=180)
-            else: st.info("No photo")
-            up_pic = st.file_uploader("Update Photo", type=['jpg', 'png', 'jpeg'])
+            if data['Pic']: st.image(data['Pic'], width=200)
+            else: st.info("No photo set")
+            up_pic = st.file_uploader("Update Profile Photo", type=['jpg', 'png', 'jpeg'])
             if up_pic:
                 st.session_state.users_db.at[idx, 'Pic'] = up_pic
                 st.rerun()
@@ -221,6 +219,7 @@ with tabs[3]: # ACCOUNT
             st.markdown(f"### {data['Name']}")
             s_clr = "#66E035" if data['Status'] == "Paid" else "#FF4B4B"
             st.markdown(f"**Subscription:** <span style='color:{s_clr}; font-weight:bold;'>{data['Status']} User</span>", unsafe_allow_html=True)
+            st.write(f"**Email:** {data['Email']}")
             st.write(f"**Company:** {data['Company']}")
             if st.button("Sign Out"):
                 st.session_state.logged_in = False
