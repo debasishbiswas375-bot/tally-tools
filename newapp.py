@@ -30,7 +30,7 @@ if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.current_user = None
     st.session_state.user_role = None
-    st.session_state.user_status = None # Added to track Paid/Free status
+    st.session_state.user_status = None
 
 # --- 3. CUSTOM CSS ---
 st.markdown("""
@@ -99,22 +99,25 @@ with tabs[0]: # HOME
     if st.session_state.logged_in:
         st.markdown(f"<h1>Welcome back, {st.session_state.current_user}!</h1>", unsafe_allow_html=True)
         
-        # FIX: Check for EITHER Admin Role OR Paid Status
+        # Checking for Admin Role or Paid Status to enable the tool
         if st.session_state.user_role == "Admin" or st.session_state.user_status == "Paid":
             st.markdown("### 🛠️ Converter Tool (Full Access)")
             col1, col2 = st.columns(2, gap="large")
             with col1:
                 with st.container(border=True):
-                    st.markdown("#### 1. Settings")
-                    st.selectbox("Select Bank Format", ["SBI", "HDFC", "ICICI", "Other"])
-                    up_html = st.file_uploader("Upload Tally Master", type=['html'])
+                    st.markdown("#### 🛠️ 1. Settings & Mapping")
+                    up_html = st.file_uploader("Upload Tally Master (master.html)", type=['html'])
                     ledgers = get_ledger_names(up_html) if up_html else ["Cash", "Bank"]
                     st.selectbox("Select Bank Ledger", ledgers)
+                    st.selectbox("Select Default Party", ledgers)
             with col2:
                 with st.container(border=True):
-                    st.markdown("#### 2. Process")
-                    st.file_uploader("Drop Bank Statement", type=['pdf', 'xlsx'])
-                    st.button("🚀 Process & Generate XML")
+                    st.markdown("#### 📂 2. Upload & Convert")
+                    # Bank selection is now in the 2nd process as requested
+                    st.selectbox("Select Bank Format", ["SBI", "HDFC", "ICICI", "Other"])
+                    st.file_uploader("Drop your Bank Statement here", type=['pdf', 'xlsx'])
+                    if st.button("🚀 Process & Generate XML"):
+                        st.success("✅ Conversion Process Started! Status will appear here.")
         else:
             st.warning("⚠️ Trial Mode: Please contact Admin to upgrade to a Paid account to unlock the Converter Tool.")
     else:
@@ -151,7 +154,7 @@ with tabs[3]: # ACCOUNT
                     st.session_state.logged_in = True
                     st.session_state.current_user = u_in
                     st.session_state.user_role = match.iloc[0]['Role']
-                    st.session_state.user_status = match.iloc[0]['Status'] # Save Status
+                    st.session_state.user_status = match.iloc[0]['Status']
                     st.rerun()
                 else: st.error("Invalid credentials.")
         else:
