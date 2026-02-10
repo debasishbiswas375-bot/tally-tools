@@ -4,6 +4,7 @@ from PIL import Image
 from bs4 import BeautifulSoup
 import pdfplumber
 import io
+import base64
 
 # --- 1. CONFIGURATION & STYLING ---
 st.set_page_config(
@@ -36,6 +37,13 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # --- 2. LOGIC FUNCTIONS ---
+
+def get_img_as_base64(file):
+    try:
+        with open(file, "rb") as f:
+            data = f.read()
+        return base64.b64encode(data).decode()
+    except: return None
 
 def get_ledger_names(html_file):
     try:
@@ -122,11 +130,7 @@ def load_bank_file(file, password=None):
             
             if found:
                 file.seek(0)
-                # Safely split into multiple lines to prevent copy errors
-                return pd.read_excel(
-                    file, 
-                    header=header_idx
-                )
+                return pd.read_excel(file, header=header_idx)
             return pd.read_excel(file)
         except: return None
 
@@ -322,10 +326,18 @@ with st.container(border=True):
             else:
                 st.error("❌ Error reading file. Ensure it is a valid Statement format.")
 
-# Footer
-st.markdown("""
+# --- FOOTER WITH LOGO ---
+img_b64 = get_img_as_base64("logo.png")
+if img_b64:
+    logo_html = f'<img src="data:image/png;base64,{img_b64}" width="25" style="vertical-align: middle; margin-right: 5px;">'
+else:
+    logo_html = ""
+
+st.markdown(f"""
     <div class="footer">
-        <p style="font-size: 15px; margin-top: 5px;">Sponsored By <b class="brand-text">Uday Mondal</b> | Consultant Advocate</p>
         <p>Powered & Created by <b class="brand-text">Debasish Biswas</b> | Professional Tally Automation</p>
+        <p style="font-size: 16px; margin-top: 5px;">
+            Sponsored By {logo_html}<b class="brand-text">Uday Mondal</b> | Consultant Advocate
+        </p>
     </div>
 """, unsafe_allow_html=True)
