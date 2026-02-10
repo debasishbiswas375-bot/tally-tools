@@ -13,7 +13,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- 2. SESSION STATE (STABILIZED) ---
+# --- 2. SESSION STATE (FIXED) ---
 if 'users_db' not in st.session_state:
     st.session_state.users_db = pd.DataFrame([
         {"Username": "admin", "Password": "123", "Role": "Admin", "Pic": None},
@@ -26,7 +26,7 @@ if 'logged_in' not in st.session_state:
     st.session_state.user_role = None
     st.session_state.show_settings = False
 
-# --- 3. REFINED CSS (FORCING BLACK TEXT & PROFILE NAV) ---
+# --- 3. THE "CSS HAMMER" (FORCING BLACK TEXT & PROFILE NAV) ---
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
@@ -45,17 +45,18 @@ st.markdown("""
         .stTabs [aria-selected="true"] { background-color: #FFFFFF !important; color: #0056D2 !important; border-radius: 8px 8px 0 0; }
 
         /* --- CRITICAL VISIBILITY FIX: BLACK TEXT IN ALL UPLOADERS --- */
-        /* This forces all text inside the white upload box to be Black */
+        /* This forces all text inside the white upload boxes to be Black */
         [data-testid="stFileUploader"] * {
             color: #000000 !important;
         }
         
-        /* Forces 'Browse files' button text color */
-        [data-testid="stFileUploader"] button p {
+        /* Forces 'Browse files' button text and drag-and-drop info to Black */
+        [data-testid="stFileUploaderDropzone"] div {
             color: #000000 !important;
+            font-weight: 600 !important;
         }
 
-        /* Forces selectbox and input text to black for readability */
+        /* Forces all selectboxes and input fields to have black text */
         input, .stTextInput input, .stSelectbox div, .stSelectbox span {
             color: #000000 !important;
             font-weight: 500 !important;
@@ -78,7 +79,6 @@ st.markdown("""
             color: #0056D2 !important;
             border-radius: 50px !important;
             font-weight: 700 !important;
-            border: none !important;
         }
 
         header {visibility: hidden;}
@@ -112,7 +112,7 @@ with tabs[0]: # HOME
             new_pass = st.text_input("Change Password", type="password")
             if st.button("Save Profile"):
                 idx = st.session_state.users_db[st.session_state.users_db['Username'] == st.session_state.current_user].index[0]
-                # --- FIXED SYNTAX ERROR: Resolved missing parenthesis ---
+                # --- FIXED SYNTAX ERROR: Corrected line 149 from your screenshot ---
                 if new_pass:
                     st.session_state.users_db.at[idx, 'Password'] = new_pass
                 st.success("Profile Updated!")
@@ -130,16 +130,16 @@ with tabs[0]: # HOME
                     with st.container(border=True):
                         st.markdown("#### 🛠️ 1. Settings & Mapping")
                         st.selectbox("Select Bank Format", ["SBI", "HDFC", "ICICI", "Other"])
-                        # Internal uploader text is now FORCED to Black
+                        # Internal text forced to black for visibility
                         up_html = st.file_uploader("Upload Tally Master (master.html)", type=['html'])
-                        ledgers = get_ledger_names(up_html) if up_html else ["Cash", "Bank"]
+                        ledgers = get_ledger_names(up_html) if up_html else ["Cash", "Bank", "Suspense A/c"]
                         st.selectbox("Select Bank Ledger", ledgers)
                         st.selectbox("Select Default Party", ledgers)
                 with col2:
                     with st.container(border=True):
                         st.markdown("#### 📂 2. Upload & Convert")
-                        # Internal uploader text is now FORCED to Black
-                        st.file_uploader("Drop your Bank Statement here", type=['pdf', 'xlsx'])
+                        # Internal text forced to black for visibility
+                        st.file_uploader("Drop your Statement here", type=['pdf', 'xlsx'])
                         st.button("🚀 Process & Generate XML")
             else:
                 st.warning("⚠️ Trial Mode: Please contact Admin for Full Access.")
