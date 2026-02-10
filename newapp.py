@@ -300,10 +300,13 @@ st.markdown("""
         <p>Powered & Created by <b>Debasish.biswas</b> | Professional Tally Automation</p>
     </div>
 # Footer
-st.markdown("""   
-     <div class="footer">
-        <p>Sponsored by <b>Uday Mondal</b> | Consultant Advocate</p>
+# Footer
+st.markdown("""
+    <div class="footer">
+        <p>Powered & Created by <b>Debasish.biswas</b> | Professional Tally Automation</p>
     </div>
+# Footer
+
 """, unsafe_allow_html=True)
 
 # --- END OF FILE ---
