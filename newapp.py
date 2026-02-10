@@ -26,7 +26,7 @@ if 'logged_in' not in st.session_state:
     st.session_state.user_role = None
     st.session_state.show_settings = False
 
-# --- 3. THE "CSS HAMMER" (FORCING BLACK TEXT & PROFILE NAV) ---
+# --- 3. REFINED CSS (FORCING BLACK TEXT & PROFILE NAV) ---
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
@@ -45,18 +45,17 @@ st.markdown("""
         .stTabs [aria-selected="true"] { background-color: #FFFFFF !important; color: #0056D2 !important; border-radius: 8px 8px 0 0; }
 
         /* --- CRITICAL VISIBILITY FIX: BLACK TEXT IN ALL UPLOADERS --- */
-        /* This forces EVERY piece of text inside the upload box to be Black */
+        /* This forces all text inside the white upload box to be Black */
         [data-testid="stFileUploader"] * {
             color: #000000 !important;
         }
         
-        /* Specifically target the 'Drag and drop' area for extra strength */
-        [data-testid="stFileUploaderDropzone"] div {
+        /* Forces 'Browse files' button text color */
+        [data-testid="stFileUploader"] button p {
             color: #000000 !important;
-            font-weight: 600 !important;
         }
 
-        /* Forces all selectboxes and input fields to have black text */
+        /* Forces selectbox and input text to black for readability */
         input, .stTextInput input, .stSelectbox div, .stSelectbox span {
             color: #000000 !important;
             font-weight: 500 !important;
@@ -79,6 +78,7 @@ st.markdown("""
             color: #0056D2 !important;
             border-radius: 50px !important;
             font-weight: 700 !important;
+            border: none !important;
         }
 
         header {visibility: hidden;}
@@ -87,7 +87,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 4. LOGIC ---
+# --- 4. LOGIC FUNCTIONS ---
 def get_ledger_names(html_file):
     try:
         soup = BeautifulSoup(html_file, 'html.parser')
@@ -112,7 +112,7 @@ with tabs[0]: # HOME
             new_pass = st.text_input("Change Password", type="password")
             if st.button("Save Profile"):
                 idx = st.session_state.users_db[st.session_state.users_db['Username'] == st.session_state.current_user].index[0]
-                # --- FIXED SYNTAX ERROR: Resolved line 149 ---
+                # --- FIXED SYNTAX ERROR: Resolved missing parenthesis ---
                 if new_pass:
                     st.session_state.users_db.at[idx, 'Password'] = new_pass
                 st.success("Profile Updated!")
@@ -130,7 +130,7 @@ with tabs[0]: # HOME
                     with st.container(border=True):
                         st.markdown("#### 🛠️ 1. Settings & Mapping")
                         st.selectbox("Select Bank Format", ["SBI", "HDFC", "ICICI", "Other"])
-                        # Uploader text is now FORCED to Black
+                        # Internal uploader text is now FORCED to Black
                         up_html = st.file_uploader("Upload Tally Master (master.html)", type=['html'])
                         ledgers = get_ledger_names(up_html) if up_html else ["Cash", "Bank"]
                         st.selectbox("Select Bank Ledger", ledgers)
@@ -138,7 +138,7 @@ with tabs[0]: # HOME
                 with col2:
                     with st.container(border=True):
                         st.markdown("#### 📂 2. Upload & Convert")
-                        # Uploader text is now FORCED to Black
+                        # Internal uploader text is now FORCED to Black
                         st.file_uploader("Drop your Bank Statement here", type=['pdf', 'xlsx'])
                         st.button("🚀 Process & Generate XML")
             else:
@@ -161,7 +161,7 @@ with tabs[3]: # LOGIN
             st.rerun()
         else: st.error("Invalid credentials.")
 
-# --- 6. FOOTER ---
+# --- 6. PINNED GLOBAL FOOTER ---
 st.markdown(f"""
     <div class="footer">
         <p>Sponsored By <b>Uday Mondal</b> | Powered & Created by <b>Debasish Biswas</b></p>
