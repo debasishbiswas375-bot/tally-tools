@@ -22,83 +22,82 @@ st.markdown("""
         /* Global Font & Colors */
         html, body, [class*="css"] {
             font-family: 'Inter', sans-serif;
-            background-color: #F4F7FC; /* Light Blue-Grey Background */
+            background-color: #F1F5F9; /* Slate-100 Background */
             color: #0F172A;
         }
 
         /* Hero Section (Top Banner) */
         .hero-container {
             text-align: center;
-            padding: 60px 20px;
-            background: linear-gradient(135deg, #1E293B 0%, #0F172A 100%);
+            padding: 60px 20px 40px 20px;
+            background: linear-gradient(135deg, #0F172A 0%, #1E293B 100%); /* Slate-900 */
             color: white;
-            border-radius: 0px 0px 20px 20px;
-            margin-bottom: 30px;
+            margin: -6rem -4rem 30px -4rem; /* Stretch to edges */
+            box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1);
         }
         .hero-title {
-            font-size: 3rem;
-            font-weight: 700;
+            font-size: 3.5rem;
+            font-weight: 800;
             margin-bottom: 10px;
+            letter-spacing: -0.025em;
             background: -webkit-linear-gradient(#60A5FA, #3B82F6);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
         }
         .hero-subtitle {
-            font-size: 1.2rem;
-            color: #94A3B8;
-            font-weight: 300;
+            font-size: 1.25rem;
+            color: #94A3B8; /* Slate-400 */
+            font-weight: 400;
+            max-width: 600px;
+            margin: 0 auto;
+            line-height: 1.6;
         }
 
         /* Card Styling (White Boxes) */
-        .card {
+        .stContainer {
             background-color: white;
             padding: 25px;
-            border-radius: 12px;
-            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            border-radius: 16px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03);
             border: 1px solid #E2E8F0;
-            margin-bottom: 20px;
         }
-        .card-header {
-            font-size: 1.1rem;
-            font-weight: 600;
-            color: #334155;
-            margin-bottom: 15px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
+
+        /* Headlines inside cards */
+        h3 {
+            font-size: 1.1rem !important;
+            font-weight: 600 !important;
+            color: #334155 !important;
+            margin-bottom: 1rem !important;
         }
 
         /* Button Styling (Caelum Blue) */
         .stButton>button {
             width: 100%;
-            background-color: #2563EB; /* Caelum Blue */
+            background-color: #2563EB; /* Primary Blue */
             color: white;
             border-radius: 8px;
             height: 50px;
             font-weight: 600;
             border: none;
             transition: all 0.2s;
+            box-shadow: 0 4px 6px -1px rgba(37, 99, 235, 0.2);
         }
         .stButton>button:hover {
             background-color: #1D4ED8;
-            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
-        }
-
-        /* Success/Info Boxes */
-        .stAlert {
-            background-color: #EFF6FF;
-            border: 1px solid #BFDBFE;
-            color: #1E40AF;
+            transform: translateY(-1px);
+            box-shadow: 0 10px 15px -3px rgba(37, 99, 235, 0.3);
         }
 
         /* Footer Styling */
         .footer {
-            margin-top: 50px;
-            padding: 20px;
+            margin-top: 60px;
+            padding: 30px;
             text-align: center;
             color: #64748B;
             font-size: 0.9rem;
             border-top: 1px solid #E2E8F0;
+            background-color: white;
+            margin-bottom: -50px;
         }
         .brand-link {
             color: #2563EB;
@@ -110,6 +109,13 @@ st.markdown("""
         #MainMenu {visibility: hidden;}
         footer {visibility: hidden;}
         header {visibility: hidden;}
+        
+        /* Custom Success Message */
+        .stAlert {
+            background-color: #ECFDF5;
+            border: 1px solid #10B981;
+            color: #065F46;
+        }
     </style>
 """, unsafe_allow_html=True)
 
@@ -166,7 +172,7 @@ def extract_data_from_pdf(file, password=None):
         for i, row in df.iterrows():
             row_str = row.astype(str).str.lower().values
             if any('date' in x for x in row_str) and \
-               (any('balance' in x for x in row_str) or any('debit' in x for x in row_str)):
+               (any('balance' in x for x in row_str) or any('debit' in x for x in row_str) or any('withdrawal' in x for x in row_str)):
                 header_idx = i
                 found = True
                 break
@@ -199,7 +205,10 @@ def normalize_bank_data(df, bank_name):
         'HDFC Bank': {'Date': 'Date', 'Narration': 'Narration', 'Withdrawal Amt.': 'Debit', 'Deposit Amt.': 'Credit'},
         'Axis Bank': {'Tran Date': 'Date', 'Particulars': 'Narration', 'Debit': 'Debit', 'Credit': 'Credit'},
         'Kotak Mahindra': {'Transaction Date': 'Date', 'Transaction Details': 'Narration', 'Withdrawal Amount': 'Debit', 'Deposit Amount': 'Credit'},
-        'Yes Bank': {'Value Date': 'Date', 'Description': 'Narration', 'Debit Amount': 'Debit', 'Credit Amount': 'Credit'}
+        'Yes Bank': {'Value Date': 'Date', 'Description': 'Narration', 'Debit Amount': 'Debit', 'Credit Amount': 'Credit'},
+        'Indian Bank': {'Value Date': 'Date', 'Narration': 'Narration', 'Debit': 'Debit', 'Credit': 'Credit'},
+        'India Post (IPPB)': {'Date': 'Date', 'Remarks': 'Narration', 'Debit Amount': 'Debit', 'Credit Amount': 'Credit'},
+        'RBL Bank': {'Transaction Date': 'Date', 'Transaction Description': 'Narration', 'Withdrawal Amount': 'Debit', 'Deposit Amount': 'Credit'}
     }
     
     if bank_name in mappings:
@@ -264,74 +273,36 @@ def generate_tally_xml(df, bank_ledger_name, default_party_ledger):
         
     return xml_header + xml_body + xml_footer
 
-# --- 4. HERO SECTION (UI) ---
+# --- 4. HERO SECTION (HTML INJECTION) ---
 st.markdown("""
     <div class="hero-container">
         <div class="hero-title">Accounting Expert</div>
-        <div class="hero-subtitle">Automate your Tally accounting with AI-powered data extraction.</div>
+        <div class="hero-subtitle">Turn messy Bank Statements into Tally Vouchers in seconds.<br>Supports Excel & PDF. 99% Accuracy.</div>
     </div>
 """, unsafe_allow_html=True)
 
 # --- 5. MAIN DASHBOARD ---
+# We use a 2-column layout that looks like a SaaS dashboard
 col_left, col_right = st.columns([1, 1.5], gap="large")
 
+# --- LEFT CARD: CONFIGURATION ---
 with col_left:
-    st.markdown('<div class="card"><div class="card-header">🛠️ 1. Configuration</div>', unsafe_allow_html=True)
-    
-    # Setup Section
-    uploaded_html = st.file_uploader("Upload Tally Master (Optional)", type=['html', 'htm'])
-    ledger_list = ["Suspense A/c", "Cash", "Bank"]
-    if uploaded_html:
-        extracted = get_ledger_names(uploaded_html)
-        if extracted:
-            ledger_list = extracted
-            st.success(f"Loaded {len(ledger_list)} ledgers")
-            
-    bank_ledger = st.selectbox("Select Bank Ledger", ledger_list, index=0)
-    party_ledger = st.selectbox("Select Default Party", ledger_list, index=0)
-    st.markdown('</div>', unsafe_allow_html=True) # Close Card
-
-with col_right:
-    st.markdown('<div class="card"><div class="card-header">📂 2. Data Processing</div>', unsafe_allow_html=True)
-    
-    # File Processing Section
-    col_a, col_b = st.columns(2)
-    with col_a:
-        bank_choice = st.selectbox("Select Bank Format", ["SBI", "PNB", "ICICI", "Axis Bank", "HDFC Bank", "Kotak Mahindra", "Yes Bank", "Other"])
-    with col_b:
-        pdf_password = st.text_input("PDF Password (if any)", type="password")
-
-    uploaded_file = st.file_uploader("Upload Statement (Excel or PDF)", type=['xlsx', 'xls', 'pdf'])
-    
-    if uploaded_file:
-        df_raw = load_bank_file(uploaded_file, pdf_password)
+    with st.container(border=True):
+        st.markdown("### 🛠️ 1. Settings & Mapping")
         
-        if df_raw is not None:
-            df_clean = normalize_bank_data(df_raw, bank_choice)
-            st.dataframe(df_clean.head(), use_container_width=True, hide_index=True)
+        uploaded_html = st.file_uploader("Upload Tally Master (Optional)", type=['html', 'htm'], help="Upload 'List of Accounts.html' exported from Tally to auto-fill ledger names.")
+        
+        ledger_list = ["Suspense A/c", "Cash", "Bank"]
+        if uploaded_html:
+            extracted = get_ledger_names(uploaded_html)
+            if extracted:
+                ledger_list = extracted
+                st.success(f"✅ Synced {len(ledger_list)} ledgers from Master")
             
-            st.write("")
-            if st.button("🚀 Convert to Tally XML"):
-                xml_data = generate_tally_xml(df_clean, bank_ledger, party_ledger)
-                st.success("Conversion Successful!")
-                st.download_button("⬇️ Download XML File", xml_data, "tally_import.xml", "application/xml")
-        else:
-            st.error("Could not read file. Please check format or password.")
-            
-    st.markdown('</div>', unsafe_allow_html=True) # Close Card
+        bank_ledger = st.selectbox("Select Bank Ledger", ledger_list, index=0)
+        party_ledger = st.selectbox("Select Default Party", ledger_list, index=0)
 
-# --- 6. FOOTER ---
-# Logo Logic
-try:
-    img_b64 = get_img_as_base64("logo 1.png")
-    if not img_b64: img_b64 = get_img_as_base64("logo.png")
-except: img_b64 = None
-
-logo_html = f'<img src="data:image/png;base64,{img_b64}" width="20" style="vertical-align: middle; margin-right: 5px;">' if img_b64 else ""
-
-st.markdown(f"""
-    <div class="footer">
-        <p>Sponsored By {logo_html} <a href="#" class="brand-link">Uday Mondal</a> | Consultant Advocate</p>
-        <p style="font-size: 12px; margin-top: 5px;">Powered & Created by <span class="brand-link">Debasish Biswas</span></p>
-    </div>
-""", unsafe_allow_html=True)
+# --- RIGHT CARD: ACTION AREA ---
+with col_right:
+    with st.container(border=True):
+        st.markdown("
