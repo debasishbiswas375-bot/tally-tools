@@ -17,7 +17,7 @@ if 'users_db' not in st.session_state:
         {
             "Username": "admin", "Password": "123", "Role": "Admin", 
             "Status": "Paid", "Pic": None, "Name": "Admin User", 
-            "Mobile": "0000000000", "Email": "admin@example.com", "Company": "Master Corp"
+            "Mobile": "0000000000", "Email": "admin@example.com"
         }
     ])
 
@@ -134,7 +134,6 @@ with tabs[0]: # HOME
             with col2:
                 with st.container(border=True):
                     st.markdown("#### 📂 2. Upload & Convert")
-                    # Bank Format selection correctly in the 2nd Process Column
                     st.selectbox("Select Bank Format", ["SBI", "HDFC", "ICICI", "Other"])
                     st.file_uploader("Drop your Bank Statement here", type=['pdf', 'xlsx'])
                     if st.button("🚀 Process & Generate XML"):
@@ -162,7 +161,7 @@ with tabs[2]: # PRICING
     st.markdown("## 💰 Pricing Plans")
     p1, p2 = st.columns(2)
     with p1:
-        st.markdown('<div class="content-card" style="border-top-color:#CBD5E1;"><h4>Trial Plan</h4><ul><li>Unlimited Previews</li><li>No XML Export</li></ul><b>Price: ₹0</b></div>', unsafe_allow_html=True)
+        st.markdown('<div class="content-card" style="border-top-color:#CBD5E1;"><h4>Trial Plan</h4><ul><li>Unlimited Previews</li><li>No XML Export</li></ul><b>Price: Free</b></div>', unsafe_allow_html=True)
         st.button("Start Free", key="start_trial")
     with p2:
         st.markdown('<div class="content-card"><h4>Professional Plan</h4><ul><li>Full XML Export</li><li>Priority Support</li></ul><b>Contact Admin for Access</b></div>', unsafe_allow_html=True)
@@ -190,18 +189,17 @@ with tabs[3]: # ACCOUNT (INTEGRATED)
             r_email = st.text_input("Email ID *")
             r_user = st.text_input("Username *")
             r_pass = st.text_input("Password *", type="password")
-            r_comp = st.text_input("Company Name (Optional)")
+            
             if st.button("Create Account"):
                 if all([r_name, r_mob, r_email, r_user, r_pass]):
                     new_user = {
                         "Username": r_user, "Password": r_pass, "Role": "Trial", 
                         "Status": "Free", "Pic": None, "Name": r_name, 
-                        "Mobile": r_mob, "Email": r_email, 
-                        "Company": r_comp if r_comp.strip() else "N/A"
+                        "Mobile": r_mob, "Email": r_email
                     }
                     st.session_state.users_db = pd.concat([st.session_state.users_db, pd.DataFrame([new_user])], ignore_index=True)
                     st.success("✅ Registration Successful! Please switch to Login.")
-                else: st.error("Please fill in required fields.")
+                else: st.error("Please fill in all required (*) fields.")
     else:
         # PROFILE VIEW
         idx = st.session_state.users_db[st.session_state.users_db['Username'] == st.session_state.current_user].index[0]
@@ -220,7 +218,6 @@ with tabs[3]: # ACCOUNT (INTEGRATED)
             s_clr = "#66E035" if data['Status'] == "Paid" else "#FF4B4B"
             st.markdown(f"**Subscription:** <span style='color:{s_clr}; font-weight:bold;'>{data['Status']} User</span>", unsafe_allow_html=True)
             st.write(f"**Email:** {data['Email']}")
-            st.write(f"**Company:** {data['Company']}")
             if st.button("Sign Out"):
                 st.session_state.logged_in = False
                 st.rerun()
