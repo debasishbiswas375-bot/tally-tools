@@ -299,8 +299,9 @@ st.markdown("""
     <div class="footer">
         <p>Powered & Created by <b>Debasish.biswas</b> | Professional Tally Automation</p>
     </div>
+st.markdown("""    
      <div class="footer">
-        <p>Sponsored by<b>Uday Mondal</b> | Consultant Advocate</p>
+        <p>Sponsored by <b>Uday Mondal</b> | Consultant Advocate</p>
     </div>
 """, unsafe_allow_html=True)
 
