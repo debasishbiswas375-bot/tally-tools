@@ -25,27 +25,26 @@ if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.current_user = None
 
-# --- 3. CLEAN LIGHT THEME CSS ---
+# --- 3. CAELUM-STYLE CSS (BLUE HEADER / WHITE BODY) ---
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
         
         html, body, [class*="css"] {
             font-family: 'Inter', sans-serif;
-            background-color: #FFFFFF; /* Pure White Background */
-            color: #0F172A; /* Dark Slate Text */
+            background-color: #FFFFFF; 
+            color: #0F172A;
         }
 
-        /* --- NAVBAR / TABS STYLING --- */
+        /* --- NAVBAR --- */
         .stTabs {
-            background-color: #0044CC; /* Caelum Blue Navbar */
+            background-color: #0044CC; /* Caelum Blue */
             padding-top: 10px;
-            padding-bottom: 0px;
+            padding-bottom: 20px;
             margin-top: -6rem; 
             position: sticky;
             top: 0;
             z-index: 999;
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
         }
 
         .stTabs [data-baseweb="tab-list"] {
@@ -55,7 +54,7 @@ st.markdown("""
         }
 
         .stTabs [data-baseweb="tab"] {
-            height: 60px;
+            height: 50px;
             white-space: pre-wrap;
             background-color: transparent;
             border: none;
@@ -64,55 +63,58 @@ st.markdown("""
             font-size: 1rem;
         }
 
-        .stTabs [data-baseweb="tab"]:hover {
-            color: #FFFFFF;
-        }
+        .stTabs [data-baseweb="tab"]:hover { color: #FFFFFF; }
 
         .stTabs [aria-selected="true"] {
-            background-color: transparent !important;
+            background-color: #003399 !important; /* Slightly darker active tab */
             color: #FFFFFF !important;
-            border-bottom: 4px solid #4ADE80; /* Green Active Indicator */
-            font-weight: 700;
+            border-radius: 50px;
+            padding: 0 20px;
         }
 
-        /* --- HERO SECTION (LIGHT THEME) --- */
-        .hero-section {
-            background-color: #F8FAFC; /* Very Light Grey */
-            padding: 60px 80px 60px 80px;
-            margin: 0 -4rem 30px -4rem;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            border-bottom: 1px solid #E2E8F0;
+        /* --- HERO HEADER (BLUE) --- */
+        .hero-container {
+            background-color: #0044CC; /* Match Navbar */
+            padding: 40px 80px 80px 80px;
+            margin: -20px -4rem 40px -4rem; /* Extend full width */
+            text-align: left;
+            border-bottom: 10px solid #F1F5F9; /* Slight separation */
         }
         
-        /* Dark Blue Text for Contrast */
         .hero-title { 
-            font-size: 3.5rem; 
+            font-size: 3rem; 
             font-weight: 800; 
-            line-height: 1.1; 
-            margin-bottom: 20px; 
-            color: #0044CC !important; 
+            color: #FFFFFF !important;
+            margin-bottom: 15px;
         }
         
         .hero-subtitle { 
             font-size: 1.2rem; 
-            color: #475569 !important; /* Slate Grey */
-            margin-bottom: 30px; 
+            color: #E0E7FF !important; 
             max-width: 600px; 
-            line-height: 1.6;
+            line-height: 1.5;
         }
-        
-        /* CARD STYLING */
-        .stContainer {
+
+        /* --- MAIN CONTENT AREA (WHITE) --- */
+        /* Card Styling for Login/Register Box */
+        .auth-card {
             background-color: white;
             padding: 30px;
-            border-radius: 12px;
-            box-shadow: 0 4px 15px -3px rgba(0,0,0,0.05);
             border: 1px solid #E2E8F0;
+            border-radius: 8px;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.05);
         }
-        
-        /* Buttons */
+
+        /* Streamlit Container override */
+        .stContainer {
+            background-color: white;
+            border: 1px solid #E2E8F0;
+            border-radius: 8px;
+            padding: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+
+        /* Buttons (Green Action) */
         div[data-testid="stButton"] button {
              background-color: #4ADE80; /* Caelum Green */
              color: #0044CC; 
@@ -120,18 +122,16 @@ st.markdown("""
              border-radius: 50px;
              border: none;
              padding: 10px 25px;
-             transition: all 0.3s ease;
+             width: 100%;
         }
         div[data-testid="stButton"] button:hover {
              background-color: #22c55e;
              color: white;
-             transform: translateY(-2px);
-             box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
         }
 
         /* Footer */
         .footer {
-            margin-top: 60px; padding: 40px; text-align: center; 
+            margin-top: 80px; padding: 40px; text-align: center; 
             color: #64748B; border-top: 1px solid #E2E8F0;
             background-color: #F8FAFC; margin-bottom: -60px;
         }
@@ -289,38 +289,32 @@ def generate_tally_xml(df, bank_ledger_name, default_party_ledger):
         </TALLYMESSAGE>"""
     return xml_header + xml_body + xml_footer
 
-# --- 5. TOP NAVIGATION BAR ---
+# --- 5. NAVIGATION ---
 tabs = st.tabs(["Home", "Solutions", "Pricing", "User Management"])
 
 # --- TAB 1: HOME ---
 with tabs[0]:
-    # Hero Section with Logo (using logo.png)
-    try: hero_logo_b64 = get_img_as_base64("logo.png")
-    except: hero_logo_b64 = None
-    hero_img_html = f'<img src="data:image/png;base64,{hero_logo_b64}" style="max-width: 100%; animation: float 6s ease-in-out infinite;">' if hero_logo_b64 else ""
-
-    st.markdown(f"""
-        <div class="hero-section">
-            <div class="hero-content">
-                <div class="hero-title">Perfecting the Science of Data Extraction</div>
-                <div class="hero-subtitle">
-                    AI-powered tool to convert bank statements, financial documents into Tally XML with 99% accuracy. 
-                    Supports Excel & PDF formats.
-                </div>
+    # BLUE HERO SECTION
+    st.markdown("""
+        <div class="hero-container">
+            <div class="hero-title">Perfecting the Science of Data Extraction</div>
+            <div class="hero-subtitle">
+                AI-powered tool to convert bank statements and financial documents into Tally XML with 99% accuracy. 
+                Supports Excel & PDF formats.
             </div>
-            <div style="width: 250px;">{hero_img_html}</div>
         </div>
     """, unsafe_allow_html=True)
 
-    # --- MAIN CONTENT AREA ---
     if st.session_state.logged_in:
-        # LOGGED IN: SHOW THE TOOL
+        # LOGGED IN: SHOW DASHBOARD
+        st.markdown("### 🚀 Dashboard")
+        
         col_left, col_right = st.columns([1, 1.5], gap="large")
         
         with col_left:
-            with st.container(border=True):
-                st.markdown("### 🛠️ 1. Settings & Mapping")
-                uploaded_html = st.file_uploader("Upload Tally Master (Optional)", type=['html', 'htm'], help="Upload 'List of Accounts.html' exported from Tally.")
+            with st.container():
+                st.markdown("#### 🛠️ Settings & Mapping")
+                uploaded_html = st.file_uploader("Upload Tally Master (Optional)", type=['html', 'htm'])
                 
                 ledger_list = ["Suspense A/c", "Cash", "Bank"]
                 if uploaded_html:
@@ -333,8 +327,8 @@ with tabs[0]:
                 party_ledger = st.selectbox("Select Default Party", ledger_list, index=0)
 
         with col_right:
-            with st.container(border=True):
-                st.markdown("### 📂 2. Upload & Convert")
+            with st.container():
+                st.markdown("#### 📂 Upload & Convert")
                 c1, c2 = st.columns([1.5, 1])
                 with c1: bank_choice = st.selectbox("Bank Format", ["SBI", "PNB", "ICICI", "Axis Bank", "HDFC Bank", "Kotak Mahindra", "Yes Bank", "Indian Bank", "India Post (IPPB)", "RBL Bank", "Other"])
                 with c2: pdf_pass = st.text_input("PDF Password", type="password", placeholder="(Optional)")
@@ -356,49 +350,56 @@ with tabs[0]:
                             st.download_button("Download XML File", xml_data, "tally_import.xml", "application/xml")
                     else:
                         st.error("⚠️ Error: Could not read file. Check format or password.")
-    
+
     else:
-        # --- NOT LOGGED IN: SHOW REGISTER/LOGIN FORM ---
-        c1, c2 = st.columns([1, 1], gap="large")
+        # NOT LOGGED IN: SHOW LANDING PAGE (Image Left, Login Right)
+        col1, col2 = st.columns([1.5, 1], gap="large")
         
-        with c1:
-            st.markdown("### 🚀 Why Choose Accounting Expert?")
-            st.markdown("""
-            We simplify your accounting workflow by instantly converting bank statements into Tally-ready XML files.
+        with col1:
+            try: hero_logo_b64 = get_img_as_base64("logo.png")
+            except: hero_logo_b64 = None
+            hero_img_html = f'<img src="data:image/png;base64,{hero_logo_b64}" style="width: 80%; display:block; margin:auto;">' if hero_logo_b64 else ""
+            st.markdown(f"{hero_img_html}", unsafe_allow_html=True)
             
-            * **99% Accuracy:** Powered by advanced logic for precise extraction.
-            * **Universal Support:** Works with SBI, HDFC, ICICI, and more.
-            * **PDF & Excel:** Drag & drop support for multiple formats.
-            * **Secure:** Your data is processed locally in your session.
-            """)
-        
-        with c2:
-            with st.container(border=True):
-                auth_mode = st.radio("Access Tool:", ["Register for Free Trial", "Login"], horizontal=True)
-                st.divider()
-                
-                if auth_mode == "Login":
-                    u = st.text_input("Username", key="home_login_u")
-                    p = st.text_input("Password", type="password", key="home_login_p")
-                    if st.button("Access Dashboard"):
-                        user = st.session_state.users_db[(st.session_state.users_db['Username'] == u) & (st.session_state.users_db['Password'] == p)]
-                        if not user.empty:
-                            st.session_state.logged_in = True
-                            st.session_state.current_user = u
-                            st.rerun()
-                        else: st.error("Incorrect username or password.")
-                else:
-                    new_u = st.text_input("Create Username", key="home_reg_u")
-                    new_p = st.text_input("Create Password", type="password", key="home_reg_p")
-                    if st.button("Start Free Trial"):
-                        if new_u and new_p:
-                             if new_u in st.session_state.users_db['Username'].values:
-                                st.error("User already exists.")
-                             else:
-                                new_entry = pd.DataFrame([{"Username": new_u, "Password": new_p, "Role": "User", "Status": "Active"}])
-                                st.session_state.users_db = pd.concat([st.session_state.users_db, new_entry], ignore_index=True)
-                                st.success("Account Created! You can now Login.")
-                        else: st.warning("Please fill details.")
+            st.markdown("""
+            <div style="margin-top:20px; color:#475569;">
+                <h3>Why Choose Accounting Expert?</h3>
+                <ul>
+                    <li><strong>99% Accuracy:</strong> AI-powered extraction.</li>
+                    <li><strong>Secure:</strong> Data processed locally.</li>
+                    <li><strong>Universal:</strong> Supports most Indian banks.</li>
+                </ul>
+            </div>
+            """, unsafe_allow_html=True)
+
+        with col2:
+            st.markdown('<div class="auth-card">', unsafe_allow_html=True)
+            auth_mode = st.radio("Access Tool:", ["Register for Free Trial", "Login"], horizontal=True)
+            st.write("")
+            
+            if auth_mode == "Login":
+                u = st.text_input("Username", key="login_u")
+                p = st.text_input("Password", type="password", key="login_p")
+                if st.button("Sign In"):
+                    user = st.session_state.users_db[(st.session_state.users_db['Username'] == u) & (st.session_state.users_db['Password'] == p)]
+                    if not user.empty:
+                        st.session_state.logged_in = True
+                        st.session_state.current_user = u
+                        st.rerun()
+                    else: st.error("Incorrect credentials.")
+            else:
+                new_u = st.text_input("Create Username", key="reg_u")
+                new_p = st.text_input("Create Password", type="password", key="reg_p")
+                if st.button("Start Free Trial"):
+                    if new_u and new_p:
+                        if new_u in st.session_state.users_db['Username'].values:
+                            st.error("User exists.")
+                        else:
+                            new_entry = pd.DataFrame([{"Username": new_u, "Password": new_p, "Role": "User", "Status": "Active"}])
+                            st.session_state.users_db = pd.concat([st.session_state.users_db, new_entry], ignore_index=True)
+                            st.success("Created! Please Login.")
+                    else: st.warning("Fill all details.")
+            st.markdown('</div>', unsafe_allow_html=True)
 
 # --- TAB 2 & 3: PLACEHOLDERS ---
 with tabs[1]: st.info("Solutions Page - Coming Soon...")
