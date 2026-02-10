@@ -12,44 +12,43 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- 2. IMAGE ENCODING (THE FIX FOR LOGOS) ---
+# --- 2. IMAGE ENCODING (Base64) ---
+# This ensures logos show up even if the folder path is tricky
 def get_base64_image(image_path):
     if os.path.exists(image_path):
         with open(image_path, "rb") as img_file:
             return base64.b64encode(img_file.read()).decode()
     return ""
 
-# Pre-load Base64 strings for logos
-logo_main = get_base64_image("logo.png")
-logo_uday = get_base64_image("logo 1.png")
+logo_main_base64 = get_base64_image("logo.png")
+logo_uday_base64 = get_base64_image("logo 1.png")
 
 # --- 3. PERSISTENT DATABASE ---
 DB_FILE = "users.csv"
 def load_data():
     if os.path.exists(DB_FILE):
         return pd.read_csv(DB_FILE)
-    return pd.DataFrame([{"Username": "admin", "Password": "123", "Role": "Admin", "Status": "Paid", "Name": "Admin User"}])
+    return pd.DataFrame([{"Username": "admin", "Password": "123", "Role": "Admin", "Status": "Paid"}])
 
 if 'users_db' not in st.session_state:
     st.session_state.users_db = load_data()
 
-# --- 4. CSS (WHITE TEXT & LOGO PLACEMENT) ---
+# --- 4. CSS (LOGO PLACEMENT & WHITE TEXT) ---
 st.markdown(f"""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
         .stApp {{ background-color: #0056D2; }}
 
-        /* TOP LOGO PLACEMENT (logo.png) */
-        .top-logo {{
-            position: absolute; left: 50px; top: 20px; width: 140px; z-index: 1000;
+        /* --- THE LOGO FIX: UPPER LEFT CORNER --- */
+        .top-left-logo {{
+            position: fixed;
+            left: 30px;
+            top: 20px;
+            width: 130px; /* Adjust size as needed */
+            z-index: 10001;
         }}
 
-        /* FORCE ALL TEXT TO WHITE */
-        h1, h2, h3, h4, p, label, .stMarkdown, [data-testid="stMarkdownContainer"] p {{
-            color: #FFFFFF !important;
-        }}
-
-        /* NAVBAR TABS */
+        /* --- NAVBAR STYLING --- */
         .stTabs [data-baseweb="tab-list"] {{
             gap: 15px; justify-content: flex-end;
             background-color: rgba(255, 255, 255, 0.05);
@@ -60,43 +59,47 @@ st.markdown(f"""
             background-color: #FFFFFF !important; color: #0056D2 !important; border-radius: 50px !important; padding: 8px 20px !important;
         }}
 
-        /* PILL BUTTON DESIGN */
+        /* --- TEXT COLORS --- */
+        h1, h2, h3, h4, p, label, .stMarkdown, [data-testid="stMarkdownContainer"] p {{
+            color: #FFFFFF !important;
+        }}
+        input, .stSelectbox div {{ color: #000000 !important; font-weight: 500 !important; }}
+
+        /* --- BUTTONS --- */
         div.stButton > button {{
             background-color: #66E035 !important; color: #0056D2 !important;
             border-radius: 50px !important; font-weight: 700 !important;
             padding: 0.6rem 2.5rem !important; border: none !important;
         }}
 
-        /* INPUT VISIBILITY */
-        input, .stSelectbox div {{ color: #000000 !important; font-weight: 500 !important; }}
-
         header {{visibility: hidden;}}
 
-        /* PROFESSIONAL FOOTER */
+        /* --- PROFESSIONAL FOOTER --- */
         .footer-container {{
             position: fixed; left: 0; bottom: 0; width: 100%;
             background-color: #FFFFFF; text-align: center; padding: 15px 0; z-index: 2000;
         }}
         .footer-line1 {{ display: flex; align-items: center; justify-content: center; font-size: 16px; color: #64748B !important; margin-bottom: 4px; }}
         .footer-line2 {{ font-size: 14px; color: #94A3B8 !important; }}
-        .footer-logo {{ height: 24px; margin: 0 8px; vertical-align: middle; }}
+        .footer-logo {{ height: 22px; margin: 0 8px; vertical-align: middle; }}
         .name-highlight {{ color: #0F172A !important; font-weight: 800; }}
         .dev-highlight {{ color: #00A389 !important; font-weight: 700; }}
     </style>
 """, unsafe_allow_html=True)
 
-# --- 5. TOP LOGO RENDERING ---
-if logo_main:
-    st.markdown(f'<img src="data:image/png;base64,{logo_main}" class="top-logo">', unsafe_allow_html=True)
+# --- 5. LOGO RENDERING ---
+if logo_main_base64:
+    st.markdown(f'<img src="data:image/png;base64,{logo_main_base64}" class="top-left-logo">', unsafe_allow_html=True)
 
 # --- 6. NAVIGATION ---
 tabs = st.tabs(["Home", "Solutions", "Pricing", "Account"])
 
-with tabs[3]: # ACCOUNT TAB
+# ... (Previous logic for Home, Solutions, and Pricing goes here)
+
+with tabs[3]: # ACCOUNT (FIXED REGISTRATION)
     if not st.session_state.get('logged_in', False):
         mode = st.radio("Choose Action", ["Login", "Register"], horizontal=True)
         if mode == "Register":
-            # Form fields
             r_name = st.text_input("Full Name *", key="reg_n")
             r_mob = st.text_input("Mobile Number *", key="reg_m")
             r_email = st.text_input("Email ID *", key="reg_e")
@@ -106,7 +109,6 @@ with tabs[3]: # ACCOUNT TAB
             r_comp = st.text_input("Company Name (Optional)", key="reg_c")
             
             if st.button("Create Account"):
-                # RECTIFIED VALIDATION: Only checks essential fields
                 required = [r_name, r_mob, r_email, r_user, r_pass]
                 if all(v.strip() != "" for v in required):
                     new_user = {
@@ -119,11 +121,9 @@ with tabs[3]: # ACCOUNT TAB
                     st.success("✅ Registration Successful! Please switch to Login.")
                 else:
                     st.error("Please fill in all required (*) fields.")
-    else:
-        st.button("Sign Out", on_click=lambda: st.session_state.update({"logged_in": False}))
 
 # --- 7. FOOTER RENDERING ---
-footer_logo_html = f'<img src="data:image/png;base64,{logo_uday}" class="footer-logo">' if logo_uday else ""
+footer_logo_html = f'<img src="data:image/png;base64,{logo_uday_base64}" class="footer-logo">' if logo_uday_base64 else ""
 st.markdown(f"""
     <div class="footer-container">
         <div class="footer-line1">
