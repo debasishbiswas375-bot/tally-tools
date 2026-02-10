@@ -61,22 +61,18 @@ def extract_data_from_pdf(file, password=None):
     try:
         with pdfplumber.open(file, password=password) as pdf:
             for page in pdf.pages:
-                # Extract table from page
                 table = page.extract_table()
                 if table:
                     for row in table:
-                        # Filter out empty rows/lists
                         cleaned_row = [str(cell).replace('\n', ' ').strip() if cell else '' for cell in row]
-                        if any(cleaned_row): # If row has data
+                        if any(cleaned_row):
                             all_rows.append(cleaned_row)
                             
-        if not all_rows:
-            return None
+        if not all_rows: return None
 
-        # Convert to DataFrame
         df = pd.DataFrame(all_rows)
         
-        # Auto-detect Header: Look for row containing "Date"
+        # Auto-detect Header
         header_idx = 0
         found_header = False
         for i, row in df.iterrows():
@@ -88,9 +84,8 @@ def extract_data_from_pdf(file, password=None):
                 break
         
         if found_header:
-            # Set the header
             new_header = df.iloc[header_idx]
-            df = df[header_idx + 1:] # Data starts after header
+            df = df[header_idx + 1:] 
             df.columns = new_header
         
         return df
@@ -103,13 +98,10 @@ def extract_data_from_pdf(file, password=None):
         return None
 
 def load_bank_file(file, password=None):
-    """Smart Loader for Excel AND PDF"""
     filename = file.name.lower()
-    
     if filename.endswith('.pdf'):
         return extract_data_from_pdf(file, password)
-    
-    else: # Excel Support
+    else: 
         try:
             df_temp = pd.read_excel(file, header=None, nrows=30)
             header_idx = 0
@@ -130,7 +122,7 @@ def load_bank_file(file, password=None):
 def normalize_bank_data(df, bank_name):
     target_columns = ['Date', 'Narration', 'Debit', 'Credit']
     
-    # Normalize headers (remove newlines from PDF extraction)
+    # Clean headers
     df.columns = df.columns.astype(str).str.replace('\n', ' ').str.strip()
     
     mappings = {
@@ -140,12 +132,16 @@ def normalize_bank_data(df, bank_name):
         'Axis Bank': {'Tran Date': 'Date', 'Particulars': 'Narration', 'Debit': 'Debit', 'Credit': 'Credit'},
         'HDFC Bank': {'Date': 'Date', 'Narration': 'Narration', 'Withdrawal Amt.': 'Debit', 'Deposit Amt.': 'Credit'},
         'Kotak Mahindra': {'Transaction Date': 'Date', 'Transaction Details': 'Narration', 'Withdrawal Amount': 'Debit', 'Deposit Amount': 'Credit'},
-        'Yes Bank': {'Value Date': 'Date', 'Description': 'Narration', 'Debit Amount': 'Debit', 'Credit Amount': 'Credit'}
+        'Yes Bank': {'Value Date': 'Date', 'Description': 'Narration', 'Debit Amount': 'Debit', 'Credit Amount': 'Credit'},
+        
+        # --- NEW BANKS ADDED ---
+        'Indian Bank': {'Value Date': 'Date', 'Narration': 'Narration', 'Debit': 'Debit', 'Credit': 'Credit'},
+        'India Post (IPPB)': {'Date': 'Date', 'Remarks': 'Narration', 'Debit Amount': 'Debit', 'Credit Amount': 'Credit'},
+        'RBL Bank': {'Transaction Date': 'Date', 'Transaction Description': 'Narration', 'Withdrawal Amount': 'Debit', 'Deposit Amount': 'Credit'}
     }
     
     if bank_name in mappings:
         mapping = mappings[bank_name]
-        # Flexible renaming (case insensitive attempt could be added here, but exact match for now)
         df = df.rename(columns=mapping)
         
         for col in target_columns:
@@ -201,7 +197,7 @@ with st.sidebar:
     3. **Upload File:** Excel OR PDF statement.
     4. **Generate:** Download XML.
     """)
-    st.info("💡 Supports: Excel & PDF (SBI, HDFC, ICICI, etc.)")
+    st.info("💡 Supports: Excel & PDF (SBI, HDFC, ICICI, IPPB, RBL, etc.)")
 
 col_logo, col_title = st.columns([1, 4])
 with col_logo:
@@ -240,21 +236,18 @@ with st.container(border=True):
     
     col3, col4 = st.columns([1, 2])
     with col3:
-        bank_options = ["SBI", "PNB", "ICICI", "Axis Bank", "HDFC Bank", "Kotak Mahindra", "Yes Bank", "Other"]
+        bank_options = ["SBI", "PNB", "ICICI", "Axis Bank", "HDFC Bank", "Kotak Mahindra", "Yes Bank", "Indian Bank", "India Post (IPPB)", "RBL Bank", "Other"]
         bank_choice = st.selectbox("Select Bank Format", bank_options)
     
     with col4:
-        # ACCEPT PDF AND EXCEL
         uploaded_file = st.file_uploader("Upload Statement (Excel or PDF)", type=['xlsx', 'xls', 'pdf'])
         
-        # PASSWORD FIELD FOR PDF
         pdf_password = None
         if uploaded_file is not None and uploaded_file.name.endswith('.pdf'):
             st.warning("🔒 If PDF is password protected, enter it below:")
             pdf_password = st.text_input("PDF Password", type="password")
 
     if uploaded_file:
-        # Load File (Pass password if it's a PDF)
         df_raw = load_bank_file(uploaded_file, password=pdf_password)
         
         if df_raw is not None:
@@ -279,6 +272,6 @@ with st.container(border=True):
 st.markdown("""
     <div class="footer">
         <p>Powered & Created by <b>Debasish Biswas</b> | Professional Tally Automation</p>
-        <p style="font-size: 20px; margin-top: 5px;">Sponsored By Uday Mondal | Consultanat Advocate</p>
+        <p style="font-size: 20px; margin-top: 5px;">Sponsored By Uday Mondal | Consultant Advocate</p>
     </div>
 """, unsafe_allow_html=True)
