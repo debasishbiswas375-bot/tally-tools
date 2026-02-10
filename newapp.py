@@ -74,7 +74,7 @@ st.markdown("""
             font-weight: 700;
         }
 
-        /* --- HERO SECTION (Text Visibility Fix) --- */
+        /* --- HERO SECTION --- */
         .hero-section {
             background-color: #0044CC; /* Blue Background */
             padding: 60px 80px 100px 80px;
@@ -90,12 +90,12 @@ st.markdown("""
             font-weight: 800; 
             line-height: 1.1; 
             margin-bottom: 20px; 
-            color: #FFFFFF !important; /* White Text */
+            color: #FFFFFF !important;
         }
         
         .hero-subtitle { 
             font-size: 1.2rem; 
-            color: #E0E7FF !important; /* Light Blue/White Text */
+            color: #E0E7FF !important;
             margin-bottom: 30px; 
             max-width: 600px; 
             line-height: 1.6;
@@ -176,40 +176,63 @@ def clean_currency(value):
     try: return float(val_str)
     except: return 0.0
 
+# --- PDF EXTRACTION LOGIC ---
+def extract_data_from_pdf(file, password=None):
+    all_rows = []
+    try:
+        # Handle password being explicitly None or empty string
+        pwd = password if password else None
+        
+        with pdfplumber.open(file, password=pwd) as pdf:
+            for page in pdf.pages:
+                table = page.extract_table()
+                if table:
+                    for row in table:
+                        cleaned_row = [str(cell).replace('\n', ' ').strip() if cell else '' for cell in row]
+                        if any(cleaned_row):
+                            all_rows.append(cleaned_row)
+        if not all_rows: return None
+
+        df = pd.DataFrame(all_rows)
+        
+        header_idx = 0
+        found_header = False
+        for i, row in df.iterrows():
+            row_str = row.astype(str).str.lower().values
+            if any('date' in x for x in row_str) and \
+               (any('balance' in x for x in row_str) or any('debit' in x for x in row_str) or any('withdrawal' in x for x in row_str)):
+                header_idx = i
+                found_header = True
+                break
+        
+        if found_header:
+            new_header = df.iloc[header_idx]
+            df = df[header_idx + 1:] 
+            df.columns = new_header
+        return df
+
+    except Exception as e:
+        return None
+
 def load_bank_file(file, password=None):
-    if file.name.lower().endswith('.pdf'):
-        all_rows = []
+    filename = file.name.lower()
+    if filename.endswith('.pdf'):
+        return extract_data_from_pdf(file, password)
+    else: 
         try:
-            pwd = password if password else None
-            with pdfplumber.open(file, password=pwd) as pdf:
-                for page in pdf.pages:
-                    table = page.extract_table()
-                    if table:
-                        for row in table:
-                            cleaned = [str(cell).replace('\n', ' ').strip() if cell else '' for cell in row]
-                            if any(cleaned): all_rows.append(cleaned)
-            if not all_rows: return None
-            df = pd.DataFrame(all_rows)
-            header_idx = 0
-            for i, row in df.iterrows():
-                row_str = row.astype(str).str.lower().values
-                if any('date' in x for x in row_str):
-                    header_idx = i; break
-            df.columns = df.iloc[header_idx]; df = df[header_idx + 1:]; return df
-        except: return None
-    else:
-        try: return pd.read_excel(file)
+            return pd.read_excel(file)
         except: return None
 
 def normalize_bank_data(df, bank_name):
-    df.columns = df.columns.astype(str).str.replace('\n', ' ').str.strip()
     target_columns = ['Date', 'Narration', 'Debit', 'Credit']
+    df.columns = df.columns.astype(str).str.replace('\n', ' ').str.strip()
+    
     mappings = {
         'SBI': {'Txn Date': 'Date', 'Description': 'Narration', 'Debit': 'Debit', 'Credit': 'Credit'},
         'PNB': {'Transaction Date': 'Date', 'Narration': 'Narration', 'Debit Amount': 'Debit', 'Credit Amount': 'Credit'},
         'ICICI': {'Value Date': 'Date', 'Transaction Remarks': 'Narration', 'Withdrawal Amount (INR )': 'Debit', 'Deposit Amount (INR )': 'Credit'},
-        'HDFC Bank': {'Date': 'Date', 'Narration': 'Narration', 'Withdrawal Amt.': 'Debit', 'Deposit Amt.': 'Credit'},
         'Axis Bank': {'Tran Date': 'Date', 'Particulars': 'Narration', 'Debit': 'Debit', 'Credit': 'Credit'},
+        'HDFC Bank': {'Date': 'Date', 'Narration': 'Narration', 'Withdrawal Amt.': 'Debit', 'Deposit Amt.': 'Credit'},
         'Kotak Mahindra': {'Transaction Date': 'Date', 'Transaction Details': 'Narration', 'Withdrawal Amount': 'Debit', 'Deposit Amount': 'Credit'},
         'Yes Bank': {'Value Date': 'Date', 'Description': 'Narration', 'Debit Amount': 'Debit', 'Credit Amount': 'Credit'},
         'Indian Bank': {'Value Date': 'Date', 'Narration': 'Narration', 'Debit': 'Debit', 'Credit': 'Credit'},
@@ -218,7 +241,8 @@ def normalize_bank_data(df, bank_name):
     }
     
     if bank_name in mappings:
-        df = df.rename(columns=mappings[bank_name])
+        mapping = mappings[bank_name]
+        df = df.rename(columns=mapping)
     
     for col in target_columns:
         if col not in df.columns: df[col] = 0 if col in ['Debit', 'Credit'] else ""
@@ -229,19 +253,54 @@ def normalize_bank_data(df, bank_name):
     return df[target_columns]
 
 def generate_tally_xml(df, bank_ledger_name, default_party_ledger):
+    xml_header = """<ENVELOPE>
+    <HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER>
+    <BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>Vouchers</REPORTNAME></REQUESTDESC><REQUESTDATA>"""
+    xml_footer = """</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>"""
+    
     xml_body = ""
     for index, row in df.iterrows():
-        debit, credit = row['Debit'], row['Credit']
-        if debit > 0: vch_type, amt, l1, l2 = "Payment", debit, default_party_ledger, bank_ledger_name
-        elif credit > 0: vch_type, amt, l1, l2 = "Receipt", credit, bank_ledger_name, default_party_ledger
-        else: continue
+        debit_amt = row['Debit']
+        credit_amt = row['Credit']
         
-        try: date_str = pd.to_datetime(row['Date'], dayfirst=True).strftime("%Y%m%d")
-        except: date_str = "20240401"
-        narration = str(row['Narration']).replace("&", "&amp;").replace("<", "&lt;")
+        if debit_amt > 0:
+            vch_type = "Payment"
+            amount = debit_amt
+            led_1_name, led_1_amt, led_1_pos = default_party_ledger, -amount, "Yes"
+            led_2_name, led_2_amt, led_2_pos = bank_ledger_name, amount, "No"
+        elif credit_amt > 0:
+            vch_type = "Receipt"
+            amount = credit_amt
+            led_1_name, led_1_amt, led_1_pos = bank_ledger_name, -amount, "Yes"
+            led_2_name, led_2_amt, led_2_pos = default_party_ledger, amount, "No"
+        else: continue
 
-        xml_body += f"""<TALLYMESSAGE xmlns:UDF="TallyUDF"><VOUCHER VCHTYPE="{vch_type}" ACTION="Create" OBJVIEW="Accounting Voucher View"><DATE>{date_str}</DATE><NARRATION>{narration}</NARRATION><VOUCHERTYPENAME>{vch_type}</VOUCHERTYPENAME><ALLLEDGERENTRIES.LIST><LEDGERNAME>{l1}</LEDGERNAME><ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE><AMOUNT>{-amt}</AMOUNT></ALLLEDGERENTRIES.LIST><ALLLEDGERENTRIES.LIST><LEDGERNAME>{l2}</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>{amt}</AMOUNT></ALLLEDGERENTRIES.LIST></VOUCHER></TALLYMESSAGE>"""
-    return f"<ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>Vouchers</REPORTNAME></REQUESTDESC><REQUESTDATA>{xml_body}</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>"
+        try:
+            date_obj = pd.to_datetime(row['Date'], dayfirst=True)
+            date_str = date_obj.strftime("%Y%m%d")
+        except: date_str = "20240401"
+            
+        narration = str(row['Narration']).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+
+        xml_body += f"""<TALLYMESSAGE xmlns:UDF="TallyUDF">
+         <VOUCHER VCHTYPE="{vch_type}" ACTION="Create" OBJVIEW="Accounting Voucher View">
+          <DATE>{date_str}</DATE>
+          <NARRATION>{narration}</NARRATION>
+          <VOUCHERTYPENAME>{vch_type}</VOUCHERTYPENAME>
+          <ALLLEDGERENTRIES.LIST>
+           <LEDGERNAME>{led_1_name}</LEDGERNAME>
+           <ISDEEMEDPOSITIVE>{led_1_pos}</ISDEEMEDPOSITIVE>
+           <AMOUNT>{led_1_amt}</AMOUNT>
+          </ALLLEDGERENTRIES.LIST>
+          <ALLLEDGERENTRIES.LIST>
+           <LEDGERNAME>{led_2_name}</LEDGERNAME>
+           <ISDEEMEDPOSITIVE>{led_2_pos}</ISDEEMEDPOSITIVE>
+           <AMOUNT>{led_2_amt}</AMOUNT>
+          </ALLLEDGERENTRIES.LIST>
+         </VOUCHER>
+        </TALLYMESSAGE>"""
+        
+    return xml_header + xml_body + xml_footer
 
 # --- 5. TOP NAVIGATION BAR ---
 tabs = st.tabs(["Home", "Solutions", "Pricing", "User Management"])
@@ -273,7 +332,8 @@ with tabs[0]:
         with col_left:
             with st.container(border=True):
                 st.markdown("### 🛠️ 1. Settings & Mapping")
-                uploaded_html = st.file_uploader("Upload Tally Master (Optional)", type=['html', 'htm'])
+                uploaded_html = st.file_uploader("Upload Tally Master (Optional)", type=['html', 'htm'], help="Upload 'List of Accounts.html' exported from Tally.")
+                
                 ledger_list = ["Suspense A/c", "Cash", "Bank"]
                 if uploaded_html:
                     extracted = get_ledger_names(uploaded_html)
