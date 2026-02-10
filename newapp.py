@@ -13,7 +13,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- 2. SESSION STATE (STABILIZED) ---
+# --- 2. SESSION STATE ---
 if 'users_db' not in st.session_state:
     st.session_state.users_db = pd.DataFrame([
         {"Username": "admin", "Password": "123", "Role": "Admin", "Pic": None},
@@ -26,44 +26,46 @@ if 'logged_in' not in st.session_state:
     st.session_state.user_role = None
     st.session_state.show_settings = False
 
-# --- 3. THE VISIBILITY OVERRIDE (FORCING BLACK TEXT) ---
+# --- 3. CSS STYLING (The Visibility Fix) ---
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
         
+        /* Background */
         .stApp { background-color: #0056D2; }
 
-        /* --- NAVIGATION TABS --- */
-        .stTabs {
-            background-color: #0056D2;
-            padding-top: 10px;
-            z-index: 1000;
-            border-bottom: 1px solid rgba(255,255,255,0.2);
-        }
-        .stTabs [data-baseweb="tab-list"] { gap: 15px; justify-content: flex-end; padding-right: 20px; }
-        .stTabs [data-baseweb="tab"] { color: #FFFFFF !important; font-weight: 600; border: none !important; }
-        .stTabs [aria-selected="true"] { background-color: #FFFFFF !important; color: #0056D2 !important; border-radius: 8px 8px 0 0; }
+        /* HEADER TEXTS */
+        h1, h2, h3, h4, .stMarkdown p { color: #FFFFFF !important; }
 
-        /* --- CRITICAL VISIBILITY: MATCHING UPLOADER TEXT TO SELECTBOX STYLE --- */
-        /* This forces all labels and internal uploader text to be Solid Black */
-        [data-testid="stFileUploader"] * {
-            color: #000000 !important;
+        /* TARGETING THE 2 UPLOADER LABELS ONLY (White) */
+        [data-testid="stFileUploader"] label {
+            color: #FFFFFF !important;
+            font-weight: 600 !important;
         }
-        
-        /* Ensures the 'Drag and drop' text matches the dropdown font weight and color */
-        [data-testid="stFileUploaderDropzone"] div {
+
+        /* SELECTBOX LABELS (White) */
+        [data-testid="stSelectbox"] label {
+            color: #FFFFFF !important;
+        }
+
+        /* INTERNAL BOX TEXT (Keep Black for visibility against white) */
+        [data-testid="stFileUploaderDropzone"] div, 
+        [data-testid="stFileUploaderDropzone"] span,
+        [data-testid="stFileUploader"] button p {
             color: #000000 !important;
             font-weight: 500 !important;
         }
-
-        /* Forces selectbox and input text to black for uniform visibility */
+        
+        /* Selectbox and Input text inside the boxes (Black) */
         input, .stTextInput input, .stSelectbox div, .stSelectbox span {
             color: #000000 !important;
             font-weight: 500 !important;
         }
 
-        label { color: #FFFFFF !important; font-weight: 600 !important; }
-        h1, h2, h3, p, span, .stMarkdown { color: #FFFFFF !important; }
+        /* NAVIGATION TABS */
+        .stTabs [data-baseweb="tab-list"] { gap: 15px; justify-content: flex-end; padding-right: 20px; }
+        .stTabs [data-baseweb="tab"] { color: #FFFFFF !important; font-weight: 600; }
+        .stTabs [aria-selected="true"] { background-color: #FFFFFF !important; color: #0056D2 !important; border-radius: 8px 8px 0 0; }
 
         /* PINNED FOOTER */
         .footer {
@@ -73,12 +75,13 @@ st.markdown("""
         }
         .footer p, .footer b { color: #1E293B !important; margin: 0; }
 
-        /* BUTTONS */
+        /* PROCESS BUTTON */
         div.stButton > button {
             background-color: #66E035 !important;
             color: #0056D2 !important;
             border-radius: 50px !important;
             font-weight: 700 !important;
+            width: 100%;
         }
 
         header {visibility: hidden;}
@@ -90,17 +93,18 @@ st.markdown("""
 # --- 4. LOGIC FUNCTIONS ---
 def get_ledger_names(html_file):
     try:
+        # Extract names from Tally Master HTML
         soup = BeautifulSoup(html_file, 'html.parser')
         ledgers = [td.get_text(strip=True) for td in soup.find_all('td') if td.get_text(strip=True)]
         return sorted(list(set(ledgers)))
-    except: return ["Cash", "Bank", "Suspense A/c"]
+    except: 
+        return ["Cash", "Bank", "Suspense A/c"]
 
 # --- 5. MAIN NAVIGATION ---
 tabs = st.tabs(["Home", "Solutions", "Pricing", "Login", "Register"])
 
 with tabs[0]: # HOME
     if st.session_state.logged_in:
-        # Profile Button in Top Right
         p_col1, p_col2 = st.columns([12, 1.5])
         with p_col2:
             if st.button("👤 Profile"):
@@ -112,9 +116,8 @@ with tabs[0]: # HOME
             new_pass = st.text_input("Change Password", type="password")
             if st.button("Save Profile"):
                 idx = st.session_state.users_db[st.session_state.users_db['Username'] == st.session_state.current_user].index[0]
-                # FIXED SYNTAX ERROR FROM LINE 149
                 if new_pass:
-                    st.session_state.users_db.at[idx, 'Password'] = new_pass
+                    st.session_state.users_db.at(idx, 'Password'] = new_pass
                 st.success("Profile Updated!")
                 st.session_state.show_settings = False
                 st.rerun()
@@ -130,16 +133,20 @@ with tabs[0]: # HOME
                     with st.container(border=True):
                         st.markdown("#### 🛠️ 1. Settings & Mapping")
                         st.selectbox("Select Bank Format", ["SBI", "HDFC", "ICICI", "Other"])
-                        # VISIBILITY FIXED: master.html uploader text is now black
+                        
+                        # Label 1 (White via CSS)
                         up_html = st.file_uploader("Upload Tally Master (master.html)", type=['html'])
+                        
                         ledgers = get_ledger_names(up_html) if up_html else ["Cash", "Bank"]
                         st.selectbox("Select Bank Ledger", ledgers)
                         st.selectbox("Select Default Party", ledgers)
                 with col2:
                     with st.container(border=True):
                         st.markdown("#### 📂 2. Upload & Convert")
-                        # VISIBILITY FIXED: Statement uploader text is now black
+                        
+                        # Label 2 (White via CSS)
                         st.file_uploader("Drop your Bank Statement here", type=['pdf', 'xlsx'])
+                        
                         st.button("🚀 Process & Generate XML")
             else:
                 st.warning("⚠️ Trial Mode: Please contact Admin for Full Access.")
@@ -149,8 +156,8 @@ with tabs[0]: # HOME
 
 with tabs[3]: # LOGIN
     st.markdown("## 🔐 Sign In")
-    l_u = st.text_input("Username", key="l_u")
-    l_p = st.text_input("Password", type="password", key="l_p")
+    l_u = st.text_input("Username", key="login_u")
+    l_p = st.text_input("Password", type="password", key="login_p")
     if st.button("Sign In"):
         db = st.session_state.users_db
         user_match = db[(db['Username'] == l_u) & (db['Password'] == l_p)]
@@ -159,7 +166,8 @@ with tabs[3]: # LOGIN
             st.session_state.current_user = l_u
             st.session_state.user_role = user_match.iloc[0]['Role']
             st.rerun()
-        else: st.error("Invalid credentials.")
+        else: 
+            st.error("Invalid credentials.")
 
 # --- 6. FOOTER ---
 st.markdown(f"""
