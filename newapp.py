@@ -325,7 +325,7 @@ with st.container(border=True):
 # Footer
 st.markdown("""
     <div class="footer">
+        <p style="font-size: 15px; margin-top: 5px;">Sponsored By <b class="brand-text">Uday Mondal</b> | Consultant Advocate</p>
         <p>Powered & Created by <b class="brand-text">Debasish Biswas</b> | Professional Tally Automation</p>
-        <p style="font-size: 14px; margin-top: 5px;">Sponsored By <b class="brand-text">Uday Mondal</b> | Consultant Advocate</p>
     </div>
 """, unsafe_allow_html=True)
