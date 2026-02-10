@@ -286,17 +286,17 @@ def generate_tally_xml(df, bank_ledger_name, default_party_ledger):
         
     return xml_header + xml_body + xml_footer
 
-# --- 4. HERO SECTION WITH LOGO ---
-# Load logo safely
+# --- 4. HERO SECTION WITH MAIN LOGO ---
+# Uses 'logo.png' (The Shield)
 try:
-    img_b64 = get_img_as_base64("logo.png")
-except: img_b64 = None
+    hero_logo_b64 = get_img_as_base64("logo.png")
+except: hero_logo_b64 = None
 
-logo_html = f'<img src="data:image/png;base64,{img_b64}" width="120" style="margin-bottom: 20px;">' if img_b64 else ""
+hero_logo_html = f'<img src="data:image/png;base64,{hero_logo_b64}" width="120" style="margin-bottom: 20px;">' if hero_logo_b64 else ""
 
 st.markdown(f"""
     <div class="hero-container">
-        {logo_html}
+        {hero_logo_html}
         <div class="hero-title">Accounting Expert</div>
         <div class="hero-subtitle">Turn messy Bank Statements into Tally Vouchers in seconds.<br>Supports Excel & PDF. 99% Accuracy.</div>
     </div>
@@ -355,14 +355,17 @@ with col_right:
                 st.error("⚠️ Could not read file. Check format or password.")
 
 # --- 6. FOOTER ---
-# Mini logo for footer
-mini_logo_html = f'<img src="data:image/png;base64,{img_b64}" width="20" style="vertical-align: middle; margin-right: 8px;">' if img_b64 else ""
+# Uses 'logo 1.png' (For Uday Mondal)
+try:
+    footer_logo_b64 = get_img_as_base64("logo 1.png")
+except: footer_logo_b64 = None
+
+# If 'logo 1.png' is missing, do not show any image to avoid broken icons
+footer_logo_html = f'<img src="data:image/png;base64,{footer_logo_b64}" width="25" style="vertical-align: middle; margin-right: 8px;">' if footer_logo_b64 else ""
 
 st.markdown(f"""
     <div class="footer">
-        <p>Sponsored By {mini_logo_html} <span class="brand-link" style="color:#0F172A;">Uday Mondal</span> | Consultant Advocate</p>
+        <p>Sponsored By {footer_logo_html} <span class="brand-link" style="color:#0F172A;">Uday Mondal</span> | Consultant Advocate</p>
         <p style="font-size: 13px; margin-top: 8px;">Powered & Created by <span class="brand-link">Debasish Biswas</span> | Professional Tally Automation</p>
     </div>
 """, unsafe_allow_html=True)
-
-
