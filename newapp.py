@@ -5,6 +5,7 @@ from bs4 import BeautifulSoup
 import pdfplumber
 import io
 import base64
+import time
 
 # --- 1. PAGE CONFIGURATION ---
 st.set_page_config(
@@ -14,218 +15,106 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- 2. CAELUM.AI EXACT CLONE CSS ---
+# --- 2. SESSION STATE (DATABASE & LOGIN) ---
+# This acts as your database for now.
+if 'users_db' not in st.session_state:
+    st.session_state.users_db = pd.DataFrame([
+        {"Username": "admin", "Password": "123", "Role": "Admin", "Status": "Active"},
+        {"Username": "uday", "Password": "123", "Role": "User", "Status": "Active"}
+    ])
+
+if 'logged_in' not in st.session_state:
+    st.session_state.logged_in = False
+    st.session_state.current_user = None
+
+# --- 3. CUSTOM CSS (CAELUM STYLE + TABS) ---
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
         
-        /* Global Settings */
         html, body, [class*="css"] {
             font-family: 'Inter', sans-serif;
             background-color: #F8FAFC; 
             color: #0F172A;
-            overflow-x: hidden;
         }
 
-        /* --- NAVIGATION BAR (Mock) --- */
-        .nav-container {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            padding: 20px 50px;
-            background-color: #0044CC; /* Caelum Blue */
-            color: white;
-            font-size: 0.9rem;
-            font-weight: 500;
-            margin: -6rem -4rem 0 -4rem; /* Stretch to top */
-        }
-        .nav-logo {
-            font-size: 1.5rem;
-            font-weight: 800;
-            display: flex;
-            align-items: center;
+        /* --- STYLING STREAMLIT TABS TO LOOK LIKE NAVBAR --- */
+        .stTabs [data-baseweb="tab-list"] {
             gap: 10px;
+            background-color: #0044CC; /* Caelum Blue */
+            padding: 10px 20px;
+            border-radius: 0px 0px 10px 10px;
+            margin-top: -6rem; /* Pull up to top */
+            position: sticky;
+            top: 0;
+            z-index: 100;
         }
-        .nav-links {
-            display: flex;
-            gap: 30px;
-            align-items: center;
-        }
-        .nav-link { color: white; text-decoration: none; opacity: 0.9; cursor: pointer; }
-        .nav-link:hover { opacity: 1; text-decoration: underline; }
-        
-        .nav-btn-login {
-            border: 1px solid white;
-            padding: 8px 20px;
-            border-radius: 50px;
-            background: transparent;
-            color: white;
-            cursor: pointer;
-        }
-        .nav-btn-trial {
-            background-color: #4ADE80; /* Bright Green */
-            color: #0044CC;
-            padding: 8px 20px;
-            border-radius: 50px;
+
+        .stTabs [data-baseweb="tab"] {
+            height: 50px;
+            white-space: pre-wrap;
+            background-color: transparent;
+            border-radius: 4px;
+            color: rgba(255, 255, 255, 0.7);
+            font-weight: 600;
+            font-size: 1rem;
             border: none;
-            font-weight: 700;
-            cursor: pointer;
+        }
+
+        .stTabs [aria-selected="true"] {
+            background-color: rgba(255, 255, 255, 0.2) !important;
+            color: white !important;
+            border-bottom: 3px solid #4ADE80; /* Green highlight */
         }
 
         /* --- HERO SECTION --- */
         .hero-section {
-            background-color: #0044CC; /* The Main Blue */
+            background-color: #0044CC;
             color: white;
-            padding: 60px 80px 100px 80px;
+            padding: 40px 80px 80px 80px;
             margin: 0 -4rem 30px -4rem;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            position: relative;
-            overflow: hidden;
         }
         
-        /* Background decorative circles (Subtle) */
-        .hero-section::before {
-            content: '';
-            position: absolute;
-            width: 400px;
-            height: 400px;
-            background: rgba(255, 255, 255, 0.03);
-            border-radius: 50%;
-            top: -100px;
-            right: -50px;
-        }
-
-        .hero-content {
-            max-width: 55%;
-            z-index: 2;
-        }
+        .hero-title { font-size: 3rem; font-weight: 800; line-height: 1.1; margin-bottom: 20px; }
+        .hero-subtitle { font-size: 1.1rem; opacity: 0.9; margin-bottom: 30px; }
         
-        .hero-title {
-            font-size: 3.5rem;
-            font-weight: 800;
-            line-height: 1.1;
-            margin-bottom: 20px;
-        }
-        
-        .hero-subtitle {
-            font-size: 1.1rem;
-            opacity: 0.9;
-            line-height: 1.6;
-            margin-bottom: 30px;
-            max-width: 90%;
-        }
-
-        .hero-cta {
-            background-color: #4ADE80; /* The Green Button */
-            color: #0044CC;
-            padding: 15px 35px;
-            border-radius: 50px;
-            font-weight: 700;
-            border: none;
-            font-size: 1rem;
-            display: inline-block;
-            box-shadow: 0 4px 15px rgba(74, 222, 128, 0.3);
-        }
-
-        .hero-image-container {
-            width: 40%;
-            display: flex;
-            justify-content: center;
-            z-index: 2;
-        }
-        
-        .hero-image-container img {
-            max-width: 100%;
-            filter: drop-shadow(0 10px 20px rgba(0,0,0,0.2));
-            animation: float 6s ease-in-out infinite;
-        }
-
-        @keyframes float {
-            0% { transform: translateY(0px); }
-            50% { transform: translateY(-15px); }
-            100% { transform: translateY(0px); }
-        }
-
-        /* --- MAIN APP CARDS --- */
+        /* CARD STYLING */
         .stContainer {
             background-color: white;
             padding: 30px;
             border-radius: 12px;
-            box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05);
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
             border: 1px solid #E2E8F0;
         }
         
-        h3 {
-            color: #0F172A !important;
-            font-weight: 700 !important;
-        }
-
-        /* Streamlit Buttons to match the Green Theme */
-        .stButton>button {
-            background-color: #0044CC; /* Blue */
-            color: white;
-            border-radius: 8px;
-            height: 50px;
-            font-weight: 600;
-            border: none;
-        }
-        .stButton>button:hover {
-            background-color: #003399;
+        /* Buttons */
+        div[data-testid="stButton"] button {
+             background-color: #0044CC; 
+             color: white; 
+             font-weight: 600;
+             border-radius: 8px;
         }
         
-        /* The GENERATE Button specifically */
-        div[data-testid="stButton"] button {
-             background-color: #4ADE80 !important; /* Green */
-             color: #0044CC !important;
-             font-weight: 800 !important;
-        }
-
         /* Footer */
         .footer {
-            margin-top: 60px;
-            padding: 40px;
-            text-align: center;
-            color: #64748B;
-            font-size: 0.9rem;
-            border-top: 1px solid #E2E8F0;
-            background-color: white;
-            margin-bottom: -60px;
+            margin-top: 60px; padding: 40px; text-align: center; 
+            color: #64748B; border-top: 1px solid #E2E8F0;
+            background-color: white; margin-bottom: -60px;
         }
-        .brand-link { color: #0044CC; font-weight: 700; text-decoration: none; }
         
-        #MainMenu {visibility: hidden;}
-        footer {visibility: hidden;}
-        header {visibility: hidden;}
+        #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. HELPER FUNCTIONS ---
-
+# --- 4. HELPER FUNCTIONS ---
 def get_img_as_base64(file):
     try:
-        with open(file, "rb") as f:
-            data = f.read()
+        with open(file, "rb") as f: data = f.read()
         return base64.b64encode(data).decode()
     except: return None
-
-def get_ledger_names(html_file):
-    try:
-        soup = BeautifulSoup(html_file, 'html.parser')
-        ledgers = []
-        rows = soup.find_all('tr')
-        for row in rows:
-            cols = row.find_all('td')
-            if cols:
-                text = cols[0].get_text(strip=True)
-                if text: ledgers.append(text)
-        if not ledgers:
-            all_text = soup.get_text(separator='\n')
-            lines = [line.strip() for line in all_text.split('\n') if line.strip()]
-            ledgers = sorted(list(set(lines)))
-        return sorted(ledgers)
-    except: return []
 
 def clean_currency(value):
     if pd.isna(value) or value == '': return 0.0
@@ -233,229 +122,210 @@ def clean_currency(value):
     try: return float(val_str)
     except: return 0.0
 
-# PDF Extraction
-def extract_data_from_pdf(file, password=None):
-    all_rows = []
-    try:
-        with pdfplumber.open(file, password=password) as pdf:
-            for page in pdf.pages:
-                table = page.extract_table()
-                if table:
-                    for row in table:
-                        cleaned_row = [str(cell).replace('\n', ' ').strip() if cell else '' for cell in row]
-                        if any(cleaned_row):
-                            all_rows.append(cleaned_row)
-        if not all_rows: return None
-        df = pd.DataFrame(all_rows)
-        
-        # Smart Header Detection
-        header_idx = 0
-        found = False
-        for i, row in df.iterrows():
-            row_str = row.astype(str).str.lower().values
-            if any('date' in x for x in row_str) and \
-               (any('balance' in x for x in row_str) or any('debit' in x for x in row_str)):
-                header_idx = i
-                found = True
-                break
-        
-        if found:
-            new_header = df.iloc[header_idx]
-            df = df[header_idx + 1:] 
-            df.columns = new_header
-        return df
-    except Exception as e:
-        return None
-
 def load_bank_file(file, password=None):
     if file.name.lower().endswith('.pdf'):
-        return extract_data_from_pdf(file, password)
-    else:
+        # PDF Logic embedded directly here for brevity
+        all_rows = []
         try:
-            return pd.read_excel(file)
+            with pdfplumber.open(file, password=password) as pdf:
+                for page in pdf.pages:
+                    table = page.extract_table()
+                    if table:
+                        for row in table:
+                            cleaned = [str(cell).replace('\n', ' ').strip() if cell else '' for cell in row]
+                            if any(cleaned): all_rows.append(cleaned)
+            if not all_rows: return None
+            df = pd.DataFrame(all_rows)
+            # Simple Header Search
+            header_idx = 0
+            for i, row in df.iterrows():
+                row_str = row.astype(str).str.lower().values
+                if any('date' in x for x in row_str):
+                    header_idx = i; break
+            df.columns = df.iloc[header_idx]; df = df[header_idx + 1:]; return df
+        except: return None
+    else:
+        try: return pd.read_excel(file)
         except: return None
 
 def normalize_bank_data(df, bank_name):
     df.columns = df.columns.astype(str).str.replace('\n', ' ').str.strip()
     target_columns = ['Date', 'Narration', 'Debit', 'Credit']
-    
     mappings = {
         'SBI': {'Txn Date': 'Date', 'Description': 'Narration', 'Debit': 'Debit', 'Credit': 'Credit'},
         'PNB': {'Transaction Date': 'Date', 'Narration': 'Narration', 'Debit Amount': 'Debit', 'Credit Amount': 'Credit'},
         'ICICI': {'Value Date': 'Date', 'Transaction Remarks': 'Narration', 'Withdrawal Amount (INR )': 'Debit', 'Deposit Amount (INR )': 'Credit'},
         'HDFC Bank': {'Date': 'Date', 'Narration': 'Narration', 'Withdrawal Amt.': 'Debit', 'Deposit Amt.': 'Credit'},
         'Axis Bank': {'Tran Date': 'Date', 'Particulars': 'Narration', 'Debit': 'Debit', 'Credit': 'Credit'},
-        'Kotak Mahindra': {'Transaction Date': 'Date', 'Transaction Details': 'Narration', 'Withdrawal Amount': 'Debit', 'Deposit Amount': 'Credit'},
-        'Yes Bank': {'Value Date': 'Date', 'Description': 'Narration', 'Debit Amount': 'Debit', 'Credit Amount': 'Credit'},
-        'Indian Bank': {'Value Date': 'Date', 'Narration': 'Narration', 'Debit': 'Debit', 'Credit': 'Credit'},
-        'India Post (IPPB)': {'Date': 'Date', 'Remarks': 'Narration', 'Debit Amount': 'Debit', 'Credit Amount': 'Credit'},
-        'RBL Bank': {'Transaction Date': 'Date', 'Transaction Description': 'Narration', 'Withdrawal Amount': 'Debit', 'Deposit Amount': 'Credit'}
     }
-    
+    # Basic mapping logic
     if bank_name in mappings:
-        mapping = mappings[bank_name]
-        df = df.rename(columns=mapping)
-        for col in target_columns:
-            if col not in df.columns:
-                df[col] = 0 if col in ['Debit', 'Credit'] else ""
-        df['Debit'] = df['Debit'].apply(clean_currency)
-        df['Credit'] = df['Credit'].apply(clean_currency)
-        df['Narration'] = df['Narration'].fillna('')
-        return df[target_columns]
-    return df
+        df = df.rename(columns=mappings[bank_name])
+    
+    # Ensure columns exist
+    for col in target_columns:
+        if col not in df.columns: df[col] = 0 if col in ['Debit', 'Credit'] else ""
+            
+    df['Debit'] = df['Debit'].apply(clean_currency)
+    df['Credit'] = df['Credit'].apply(clean_currency)
+    df['Narration'] = df['Narration'].fillna('')
+    return df[target_columns]
 
 def generate_tally_xml(df, bank_ledger_name, default_party_ledger):
-    xml_header = """<ENVELOPE>
-    <HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER>
-    <BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>Vouchers</REPORTNAME></REQUESTDESC><REQUESTDATA>"""
-    xml_footer = """</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>"""
-    
     xml_body = ""
     for index, row in df.iterrows():
-        debit_amt = row['Debit']
-        credit_amt = row['Credit']
-        
-        if debit_amt > 0:
-            vch_type = "Payment"
-            amount = debit_amt
-            led_1_name, led_1_amt = default_party_ledger, -amount
-            led_2_name, led_2_amt = bank_ledger_name, amount
-        elif credit_amt > 0:
-            vch_type = "Receipt"
-            amount = credit_amt
-            led_1_name, led_1_amt = bank_ledger_name, -amount
-            led_2_name, led_2_amt = default_party_ledger, amount
+        debit, credit = row['Debit'], row['Credit']
+        if debit > 0: vch_type, amt, l1, l2 = "Payment", debit, default_party_ledger, bank_ledger_name
+        elif credit > 0: vch_type, amt, l1, l2 = "Receipt", credit, bank_ledger_name, default_party_ledger
         else: continue
-
-        try:
-            date_obj = pd.to_datetime(row['Date'], dayfirst=True)
-            date_str = date_obj.strftime("%Y%m%d")
+        
+        try: date_str = pd.to_datetime(row['Date'], dayfirst=True).strftime("%Y%m%d")
         except: date_str = "20240401"
-            
-        narration = str(row['Narration']).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        narration = str(row['Narration']).replace("&", "&amp;").replace("<", "&lt;")
 
-        xml_body += f"""<TALLYMESSAGE xmlns:UDF="TallyUDF">
-         <VOUCHER VCHTYPE="{vch_type}" ACTION="Create" OBJVIEW="Accounting Voucher View">
-          <DATE>{date_str}</DATE>
-          <NARRATION>{narration}</NARRATION>
-          <VOUCHERTYPENAME>{vch_type}</VOUCHERTYPENAME>
-          <ALLLEDGERENTRIES.LIST>
-           <LEDGERNAME>{led_1_name}</LEDGERNAME>
-           <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
-           <AMOUNT>{led_1_amt}</AMOUNT>
-          </ALLLEDGERENTRIES.LIST>
-          <ALLLEDGERENTRIES.LIST>
-           <LEDGERNAME>{led_2_name}</LEDGERNAME>
-           <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>
-           <AMOUNT>{led_2_amt}</AMOUNT>
-          </ALLLEDGERENTRIES.LIST>
-         </VOUCHER>
-        </TALLYMESSAGE>"""
-        
-    return xml_header + xml_body + xml_footer
+        xml_body += f"""<TALLYMESSAGE xmlns:UDF="TallyUDF"><VOUCHER VCHTYPE="{vch_type}" ACTION="Create" OBJVIEW="Accounting Voucher View"><DATE>{date_str}</DATE><NARRATION>{narration}</NARRATION><VOUCHERTYPENAME>{vch_type}</VOUCHERTYPENAME><ALLLEDGERENTRIES.LIST><LEDGERNAME>{l1}</LEDGERNAME><ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE><AMOUNT>{-amt}</AMOUNT></ALLLEDGERENTRIES.LIST><ALLLEDGERENTRIES.LIST><LEDGERNAME>{l2}</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>{amt}</AMOUNT></ALLLEDGERENTRIES.LIST></VOUCHER></TALLYMESSAGE>"""
+    return f"<ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>Vouchers</REPORTNAME></REQUESTDESC><REQUESTDATA>{xml_body}</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>"
 
-# --- 4. HERO SECTION (HTML INJECTION) ---
-# Prepare Base64 Image for the Hero Section (Main Logo)
-try:
-    hero_logo_b64 = get_img_as_base64("logo.png")
-    hero_img_html = f'<img src="data:image/png;base64,{hero_logo_b64}" alt="App Logo">'
-except: 
-    hero_img_html = '<div style="font-size: 100px;">📊</div>'
+# --- 5. MAIN NAVIGATION (Active Tabs) ---
+# This creates the functional Top Bar
+tabs = st.tabs(["🏠 Home", "🛠️ User Management", "💎 Pricing"])
 
-st.markdown(f"""
-    <div class="nav-container">
-        <div class="nav-logo">
-            <span>Accounting Expert</span>
-        </div>
-        <div class="nav-links">
-            <span class="nav-link">Home</span>
-            <span class="nav-link">Solutions</span>
-            <span class="nav-link">Pricing</span>
-            <span class="nav-link">Contact Sales</span>
-            <button class="nav-btn-login">Login</button>
-            <button class="nav-btn-trial">Free Trial</button>
-        </div>
-    </div>
+# --- TAB 1: HOME (THE CONVERTER) ---
+with tabs[0]:
+    # Hero Section
+    try: hero_logo_b64 = get_img_as_base64("logo.png")
+    except: hero_logo_b64 = None
+    hero_img_html = f'<img src="data:image/png;base64,{hero_logo_b64}" style="max-width: 100%; animation: float 6s ease-in-out infinite;">' if hero_logo_b64 else ""
 
-    <div class="hero-section">
-        <div class="hero-content">
-            <div class="hero-title">Perfecting the Science of Data Extraction</div>
-            <div class="hero-subtitle">
-                AI-powered tool to convert bank statements, financial documents into Tally XML with 99% accuracy. 
-                Supports Excel & PDF formats.
+    st.markdown(f"""
+        <div class="hero-section">
+            <div class="hero-content">
+                <div class="hero-title">Accounting Expert AI</div>
+                <div class="hero-subtitle">Convert PDF & Excel Bank Statements to Tally XML instantly. <br>Secure, Fast, and 99% Accurate.</div>
             </div>
-            <div class="hero-cta">Sign Up For Free Trial</div>
+            <div style="width: 300px;">{hero_img_html}</div>
         </div>
-        <div class="hero-image-container">
-            {hero_img_html}
-        </div>
-    </div>
-""", unsafe_allow_html=True)
+    """, unsafe_allow_html=True)
 
-# --- 5. MAIN DASHBOARD ---
-col_left, col_right = st.columns([1, 1.5], gap="large")
+    # Converter UI
+    col_left, col_right = st.columns([1, 1.5], gap="large")
+    
+    with col_left:
+        with st.container(border=True):
+            st.markdown("### 1. Settings")
+            bank_ledger = st.text_input("Bank Ledger Name", value="Bank")
+            party_ledger = st.text_input("Default Party/Suspense", value="Suspense A/c")
 
-# LEFT CARD: CONFIGURATION
-with col_left:
-    with st.container():
-        st.markdown("### 🛠️ 1. Settings & Mapping")
-        
-        uploaded_html = st.file_uploader("Upload Tally Master (Optional)", type=['html', 'htm'])
-        ledger_list = ["Suspense A/c", "Cash", "Bank"]
-        if uploaded_html:
-            extracted = get_ledger_names(uploaded_html)
-            if extracted:
-                ledger_list = extracted
-                st.success(f"✅ Synced {len(ledger_list)} ledgers")
+    with col_right:
+        with st.container(border=True):
+            st.markdown("### 2. Upload & Convert")
+            c1, c2 = st.columns([1.5, 1])
+            with c1: bank_choice = st.selectbox("Bank Format", ["SBI", "PNB", "ICICI", "Axis Bank", "HDFC Bank", "Other"])
+            with c2: pdf_pass = st.text_input("PDF Password", type="password")
+
+            uploaded_file = st.file_uploader("Upload Statement", type=['xlsx', 'xls', 'pdf'])
             
-        bank_ledger = st.selectbox("Select Bank Ledger", ledger_list, index=0)
-        party_ledger = st.selectbox("Select Default Party", ledger_list, index=0)
-
-# RIGHT CARD: ACTION AREA
-with col_right:
-    with st.container():
-        st.markdown("### 📂 2. Upload & Convert")
-        
-        c1, c2 = st.columns([1.5, 1])
-        with c1:
-            bank_choice = st.selectbox("Select Bank Format", ["SBI", "PNB", "ICICI", "Axis Bank", "HDFC Bank", "Kotak Mahindra", "Yes Bank", "Indian Bank", "India Post (IPPB)", "RBL Bank", "Other"])
-        with c2:
-            pdf_password = st.text_input("PDF Password", type="password", placeholder="Optional")
-
-        uploaded_file = st.file_uploader("Drop your Statement here (Excel or PDF)", type=['xlsx', 'xls', 'pdf'])
-        
-        if uploaded_file:
-            st.markdown("---")
-            with st.spinner("Analyzing document structure..."):
-                df_raw = load_bank_file(uploaded_file, pdf_password)
-            
-            if df_raw is not None:
-                df_clean = normalize_bank_data(df_raw, bank_choice)
+            if uploaded_file:
+                with st.spinner("Processing..."):
+                    df_raw = load_bank_file(uploaded_file, pdf_pass)
                 
-                st.write("**Data Preview:**")
-                st.dataframe(df_clean.head(3), use_container_width=True, hide_index=True)
-                
-                st.write("")
-                # The button here is styled green via CSS above
-                if st.button("🚀 Convert to Tally XML"):
-                    xml_data = generate_tally_xml(df_clean, bank_ledger, party_ledger)
-                    st.balloons()
-                    st.success("Conversion Successful! Ready for Import.")
-                    st.download_button("⬇️ Download XML File", xml_data, "tally_import.xml", "application/xml")
-            else:
-                st.error("⚠️ Could not read file. Check format or password.")
+                if df_raw is not None:
+                    df_clean = normalize_bank_data(df_raw, bank_choice)
+                    st.dataframe(df_clean.head(3), use_container_width=True, hide_index=True)
+                    if st.button("🚀 Convert to XML", type="primary"):
+                        xml_data = generate_tally_xml(df_clean, bank_ledger, party_ledger)
+                        st.success("Done!")
+                        st.download_button("Download XML", xml_data, "tally.xml")
+                else:
+                    st.error("Format not recognized or password incorrect.")
 
-# --- 6. FOOTER ---
-# Load Uday Mondal's Logo
-try:
-    footer_logo_b64 = get_img_as_base64("logo 1.png")
+# --- TAB 2: USER MANAGEMENT (LOGIN & ADMIN) ---
+with tabs[1]:
+    st.markdown("<br>", unsafe_allow_html=True) # Spacer
+    
+    if not st.session_state.logged_in:
+        # LOGIN SCREEN
+        col1, col2, col3 = st.columns([1, 1, 1])
+        with col2:
+            with st.container(border=True):
+                st.markdown("### 🔐 Admin Login")
+                username = st.text_input("Username")
+                password = st.text_input("Password", type="password")
+                
+                if st.button("Login"):
+                    user_record = st.session_state.users_db[
+                        (st.session_state.users_db['Username'] == username) & 
+                        (st.session_state.users_db['Password'] == password)
+                    ]
+                    
+                    if not user_record.empty:
+                        st.session_state.logged_in = True
+                        st.session_state.current_user = username
+                        st.rerun()
+                    else:
+                        st.error("Invalid Username or Password")
+                
+                st.info("Default: admin / 123")
+    else:
+        # DASHBOARD (LOGGED IN)
+        st.markdown(f"### 👋 Welcome back, {st.session_state.current_user}!")
+        
+        m1, m2, m3 = st.columns(3)
+        m1.metric("Total Users", len(st.session_state.users_db))
+        m2.metric("Active Sessions", "1")
+        m3.metric("System Status", "Online")
+        
+        st.divider()
+        
+        c_list, c_add = st.columns([2, 1])
+        
+        with c_list:
+            st.markdown("#### 👥 User List")
+            st.dataframe(st.session_state.users_db[["Username", "Role", "Status"]], use_container_width=True)
+        
+        with c_add:
+            with st.container(border=True):
+                st.markdown("#### ➕ Add New User")
+                new_user = st.text_input("New Username")
+                new_pass = st.text_input("New Password", type="password")
+                new_role = st.selectbox("Role", ["User", "Admin"])
+                
+                if st.button("Create User"):
+                    new_entry = pd.DataFrame([{"Username": new_user, "Password": new_pass, "Role": new_role, "Status": "Active"}])
+                    st.session_state.users_db = pd.concat([st.session_state.users_db, new_entry], ignore_index=True)
+                    st.success("User Added!")
+                    st.rerun()
+
+        if st.button("Logout"):
+            st.session_state.logged_in = False
+            st.rerun()
+
+# --- TAB 3: PRICING (STATIC) ---
+with tabs[2]:
+    st.markdown("<br><br><h2 style='text-align:center'>Simple, Transparent Pricing</h2>", unsafe_allow_html=True)
+    p1, p2, p3 = st.columns(3)
+    
+    with p2:
+        with st.container(border=True):
+            st.markdown("""
+                <h3 style='text-align:center'>Pro Plan</h3>
+                <h1 style='text-align:center; color:#0044CC'>$19<span style='font-size:1rem'>/mo</span></h1>
+                <ul>
+                    <li>Unlimited PDF Conversions</li>
+                    <li>24/7 Support</li>
+                    <li>Advanced User Management</li>
+                </ul>
+            """, unsafe_allow_html=True)
+            st.button("Start Free Trial", use_container_width=True)
+
+# --- FOOTER ---
+try: footer_logo_b64 = get_img_as_base64("logo 1.png")
 except: footer_logo_b64 = None
-
-footer_logo_html = f'<img src="data:image/png;base64,{footer_logo_b64}" width="25" style="vertical-align: middle; margin-right: 8px;">' if footer_logo_b64 else ""
+footer_html = f'<img src="data:image/png;base64,{footer_logo_b64}" width="25">' if footer_logo_b64 else ""
 
 st.markdown(f"""
     <div class="footer">
-        <p>Sponsored By {footer_logo_html} <span class="brand-link">Uday Mondal</span> | Consultant Advocate</p>
-        <p style="font-size: 13px; margin-top: 8px;">Powered & Created by <span class="brand-link">Debasish Biswas</span> | Professional Tally Automation</p>
+        <p>Sponsored By {footer_html} <span style="color:#0044CC; font-weight:700">Uday Mondal</span> | Consultant Advocate</p>
+        <p style="font-size: 13px;">Powered & Created by <span style="color:#0044CC; font-weight:700">Debasish Biswas</span></p>
     </div>
 """, unsafe_allow_html=True)
