@@ -14,7 +14,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- 2. SESSION STATE ---
+# --- 2. SESSION STATE INITIALIZATION ---
 if 'users_db' not in st.session_state:
     st.session_state.users_db = pd.DataFrame([
         {"Username": "admin", "Password": "123", "Role": "Admin", "Pic": None},
@@ -27,40 +27,52 @@ if 'logged_in' not in st.session_state:
     st.session_state.user_role = None
     st.session_state.show_settings = False
 
-# --- 3. REFINED CSS (FIXING HOVER & TABS) ---
+# --- 3. REFINED CSS FOR ENHANCED VISIBILITY ---
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
+        
         .stApp { background-color: #0056D2; }
+
+        /* NAVIGATION BAR */
         .stTabs {
             background-color: #0056D2;
             padding-top: 10px;
             z-index: 1000;
             border-bottom: 1px solid rgba(255,255,255,0.2);
         }
+        
         .stTabs [data-baseweb="tab-list"] { gap: 15px; justify-content: flex-end; padding-right: 20px; }
         .stTabs [data-baseweb="tab"] { 
             color: #FFFFFF !important; 
             font-weight: 600; 
             font-size: 1rem;
-            border: none !important;
+            border-bottom: none !important;
         }
-        .stTabs [data-baseweb="tab"]:hover {
-            background-color: #FFFFFF !important;
-            color: #0056D2 !important;
-            border-radius: 8px !important;
-        }
+        
         .stTabs [aria-selected="true"] { 
             background-color: #FFFFFF !important; 
             color: #0056D2 !important; 
-            border-radius: 8px 8px 0 0 !important; 
+            border-radius: 8px 8px 0 0; 
         }
-        h1, h2, h3, p, span, label, .stMarkdown { color: #FFFFFF !important; }
-        .stTextInput input {
-            background-color: #F0F2F6 !important;
-            color: #1E293B !important;
-            border-radius: 8px !important;
+
+        /* --- VISIBILITY FIXES: BLACK TEXT FOR INTERNAL ELEMENTS --- */
+        /* Text inside input fields */
+        input, .stTextInput input, .stSelectbox div {
+            color: #000000 !important;
+            font-weight: 500 !important;
         }
+        
+        /* Placeholder text */
+        ::placeholder { color: #555555 !important; opacity: 1; }
+
+        /* Labels above input fields */
+        label { color: #FFFFFF !important; font-weight: 600 !important; }
+
+        /* General Headings */
+        h1, h2, h3, p, span, .stMarkdown { color: #FFFFFF !important; }
+
+        /* PINNED FOOTER */
         .footer {
             position: fixed;
             left: 0;
@@ -73,6 +85,8 @@ st.markdown("""
             border-top: 1px solid #E2E8F0;
         }
         .footer p, .footer b { color: #1E293B !important; margin: 0; }
+
+        /* BUTTONS */
         div.stButton > button {
             background-color: #66E035 !important;
             color: #0056D2 !important;
@@ -81,6 +95,7 @@ st.markdown("""
             border: none !important;
             padding: 10px 30px !important;
         }
+
         header {visibility: hidden;}
         #MainMenu {visibility: hidden;}
         .main .block-container { padding-bottom: 120px; }
@@ -116,8 +131,9 @@ with tabs[0]: # HOME
             new_pass = st.text_input("Change Password", type="password")
             if st.button("Save Profile"):
                 idx = st.session_state.users_db[st.session_state.users_db['Username'] == st.session_state.current_user].index[0]
-                # FIXED SYNTAX ERROR: Corrected parentheses for .at[] access
-                if new_pass: st.session_state.users_db.at[idx, 'Password'] = new_pass
+                # --- FIXED SYNTAX ERROR ON LINE 149 ---
+                if new_pass:
+                    st.session_state.users_db.at[idx, 'Password'] = new_pass
                 st.success("Profile Updated!")
                 st.session_state.show_settings = False
                 st.rerun()
@@ -131,18 +147,20 @@ with tabs[0]: # HOME
                 c1, c2 = st.columns(2, gap="large")
                 with c1:
                     with st.container(border=True):
-                        up_html = st.file_uploader("Upload Tally Master", type=['html'])
+                        st.markdown("#### Upload Tally Master")
+                        up_html = st.file_uploader("master.html", type=['html'])
                         ledgers = get_ledger_names(up_html) if up_html else ["Cash", "Bank"]
                         st.selectbox("Select Bank Ledger", ledgers)
                 with c2:
                     with st.container(border=True):
-                        st.file_uploader("Upload Statement", type=['xlsx', 'pdf'])
+                        st.markdown("#### Upload Statement")
+                        st.file_uploader("Bank Statement", type=['pdf', 'xlsx'])
                         st.button("🚀 Process & Generate XML")
             else:
                 st.warning("⚠️ Trial Mode: Please contact Admin for Full Access.")
     else:
         st.markdown('<h1>Perfecting the Science of Data Extraction</h1>', unsafe_allow_html=True)
-        st.info("👋 Welcome! Use the Login or Register tabs to begin.")
+        st.info("👋 Use the Login or Register tabs to begin.")
 
 with tabs[3]: # LOGIN
     st.markdown("## 🔐 Sign In")
@@ -160,8 +178,8 @@ with tabs[3]: # LOGIN
 
 with tabs[4]: # REGISTER
     st.markdown("## 🚀 Register Account")
-    r_u = st.text_input("New Username", key="r_u")
-    r_p = st.text_input("New Password", type="password", key="r_p")
+    r_u = st.text_input("New Username", key="r_u", placeholder="Choose username")
+    r_p = st.text_input("New Password", type="password", key="r_p", placeholder="Choose password")
     if st.button("Register Now"):
         if r_u in st.session_state.users_db['Username'].values:
             st.error("Username already exists!")
