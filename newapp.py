@@ -187,7 +187,7 @@ with tabs[3]: # ACCOUNT
 st.markdown("""
     <div class="footer-container">
         <div class="footer-line1">
-            Sponsored By <img src="app/static/logo1.png" class="footer-logo"> <span class="name-highlight">Uday Mondal</span> | Consultant Advocate
+            Sponsored By <img src="app/static/logo 1.png" class="footer-logo"> <span class="name-highlight">Uday Mondal</span> | Consultant Advocate
         </div>
         <div class="footer-line2">
             Powered & Created by <span class="dev-highlight">Debasish Biswas</span> | Professional Tally Automation
