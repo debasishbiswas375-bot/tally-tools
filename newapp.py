@@ -25,26 +25,27 @@ if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.current_user = None
 
-# --- 3. CAELUM-STYLE CSS ---
+# --- 3. CLEAN LIGHT THEME CSS ---
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
         
         html, body, [class*="css"] {
             font-family: 'Inter', sans-serif;
-            background-color: #F8FAFC; 
-            color: #0F172A;
+            background-color: #FFFFFF; /* Pure White Background */
+            color: #0F172A; /* Dark Slate Text */
         }
 
         /* --- NAVBAR / TABS STYLING --- */
         .stTabs {
-            background-color: #0044CC; /* Caelum Blue */
+            background-color: #0044CC; /* Caelum Blue Navbar */
             padding-top: 10px;
             padding-bottom: 0px;
             margin-top: -6rem; 
             position: sticky;
             top: 0;
             z-index: 999;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
         }
 
         .stTabs [data-baseweb="tab-list"] {
@@ -58,7 +59,7 @@ st.markdown("""
             white-space: pre-wrap;
             background-color: transparent;
             border: none;
-            color: rgba(255, 255, 255, 0.8);
+            color: rgba(255, 255, 255, 0.9);
             font-weight: 500;
             font-size: 1rem;
         }
@@ -74,28 +75,29 @@ st.markdown("""
             font-weight: 700;
         }
 
-        /* --- HERO SECTION --- */
+        /* --- HERO SECTION (LIGHT THEME) --- */
         .hero-section {
-            background-color: #0044CC; /* Blue Background */
-            padding: 60px 80px 100px 80px;
+            background-color: #F8FAFC; /* Very Light Grey */
+            padding: 60px 80px 60px 80px;
             margin: 0 -4rem 30px -4rem;
             display: flex;
             align-items: center;
             justify-content: space-between;
+            border-bottom: 1px solid #E2E8F0;
         }
         
-        /* FORCE WHITE TEXT FOR HERO */
+        /* Dark Blue Text for Contrast */
         .hero-title { 
             font-size: 3.5rem; 
             font-weight: 800; 
             line-height: 1.1; 
             margin-bottom: 20px; 
-            color: #FFFFFF !important;
+            color: #0044CC !important; 
         }
         
         .hero-subtitle { 
             font-size: 1.2rem; 
-            color: #E0E7FF !important;
+            color: #475569 !important; /* Slate Grey */
             margin-bottom: 30px; 
             max-width: 600px; 
             line-height: 1.6;
@@ -106,7 +108,7 @@ st.markdown("""
             background-color: white;
             padding: 30px;
             border-radius: 12px;
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
+            box-shadow: 0 4px 15px -3px rgba(0,0,0,0.05);
             border: 1px solid #E2E8F0;
         }
         
@@ -118,25 +120,27 @@ st.markdown("""
              border-radius: 50px;
              border: none;
              padding: 10px 25px;
+             transition: all 0.3s ease;
         }
         div[data-testid="stButton"] button:hover {
              background-color: #22c55e;
              color: white;
+             transform: translateY(-2px);
+             box-shadow: 0 4px 12px rgba(34, 197, 94, 0.4);
         }
 
         /* Footer */
         .footer {
             margin-top: 60px; padding: 40px; text-align: center; 
             color: #64748B; border-top: 1px solid #E2E8F0;
-            background-color: white; margin-bottom: -60px;
+            background-color: #F8FAFC; margin-bottom: -60px;
         }
         
         #MainMenu {visibility: hidden;} footer {visibility: hidden;} header {visibility: hidden;}
     </style>
 """, unsafe_allow_html=True)
 
-# --- 4. LOGIC FUNCTIONS (FROM YOUR NEWAPP.PY) ---
-
+# --- 4. LOGIC FUNCTIONS ---
 def get_img_as_base64(file):
     try:
         with open(file, "rb") as f: data = f.read()
@@ -215,8 +219,8 @@ def normalize_bank_data(df, bank_name):
         'SBI': {'Txn Date': 'Date', 'Description': 'Narration', 'Debit': 'Debit', 'Credit': 'Credit'},
         'PNB': {'Transaction Date': 'Date', 'Narration': 'Narration', 'Debit Amount': 'Debit', 'Credit Amount': 'Credit'},
         'ICICI': {'Value Date': 'Date', 'Transaction Remarks': 'Narration', 'Withdrawal Amount (INR )': 'Debit', 'Deposit Amount (INR )': 'Credit'},
-        'Axis Bank': {'Tran Date': 'Date', 'Particulars': 'Narration', 'Debit': 'Debit', 'Credit': 'Credit'},
         'HDFC Bank': {'Date': 'Date', 'Narration': 'Narration', 'Withdrawal Amt.': 'Debit', 'Deposit Amt.': 'Credit'},
+        'Axis Bank': {'Tran Date': 'Date', 'Particulars': 'Narration', 'Debit': 'Debit', 'Credit': 'Credit'},
         'Kotak Mahindra': {'Transaction Date': 'Date', 'Transaction Details': 'Narration', 'Withdrawal Amount': 'Debit', 'Deposit Amount': 'Credit'},
         'Yes Bank': {'Value Date': 'Date', 'Description': 'Narration', 'Debit Amount': 'Debit', 'Credit Amount': 'Credit'},
         'Indian Bank': {'Value Date': 'Date', 'Narration': 'Narration', 'Debit': 'Debit', 'Credit': 'Credit'},
@@ -358,7 +362,6 @@ with tabs[0]:
         c1, c2 = st.columns([1, 1], gap="large")
         
         with c1:
-            # Info Section (Clean White)
             st.markdown("### 🚀 Why Choose Accounting Expert?")
             st.markdown("""
             We simplify your accounting workflow by instantly converting bank statements into Tally-ready XML files.
@@ -371,7 +374,6 @@ with tabs[0]:
         
         with c2:
             with st.container(border=True):
-                # Simple Toggle for Login/Register on Home Page
                 auth_mode = st.radio("Access Tool:", ["Register for Free Trial", "Login"], horizontal=True)
                 st.divider()
                 
