@@ -13,7 +13,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- 2. SESSION STATE (FIXED) ---
+# --- 2. SESSION STATE (STABILIZED) ---
 if 'users_db' not in st.session_state:
     st.session_state.users_db = pd.DataFrame([
         {"Username": "admin", "Password": "123", "Role": "Admin", "Pic": None},
@@ -26,7 +26,7 @@ if 'logged_in' not in st.session_state:
     st.session_state.user_role = None
     st.session_state.show_settings = False
 
-# --- 3. THE "CSS HAMMER" (FORCING BLACK TEXT & PROFILE NAV) ---
+# --- 3. THE VISIBILITY OVERRIDE (FORCING BLACK TEXT) ---
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;800&display=swap');
@@ -44,19 +44,19 @@ st.markdown("""
         .stTabs [data-baseweb="tab"] { color: #FFFFFF !important; font-weight: 600; border: none !important; }
         .stTabs [aria-selected="true"] { background-color: #FFFFFF !important; color: #0056D2 !important; border-radius: 8px 8px 0 0; }
 
-        /* --- CRITICAL VISIBILITY FIX: BLACK TEXT IN ALL UPLOADERS --- */
-        /* This forces all text inside the white upload boxes to be Black */
+        /* --- CRITICAL VISIBILITY: MATCHING UPLOADER TEXT TO SELECTBOX STYLE --- */
+        /* This forces all labels and internal uploader text to be Solid Black */
         [data-testid="stFileUploader"] * {
             color: #000000 !important;
         }
         
-        /* Forces 'Browse files' button text and drag-and-drop info to Black */
+        /* Ensures the 'Drag and drop' text matches the dropdown font weight and color */
         [data-testid="stFileUploaderDropzone"] div {
             color: #000000 !important;
-            font-weight: 600 !important;
+            font-weight: 500 !important;
         }
 
-        /* Forces all selectboxes and input fields to have black text */
+        /* Forces selectbox and input text to black for uniform visibility */
         input, .stTextInput input, .stSelectbox div, .stSelectbox span {
             color: #000000 !important;
             font-weight: 500 !important;
@@ -112,7 +112,7 @@ with tabs[0]: # HOME
             new_pass = st.text_input("Change Password", type="password")
             if st.button("Save Profile"):
                 idx = st.session_state.users_db[st.session_state.users_db['Username'] == st.session_state.current_user].index[0]
-                # --- FIXED SYNTAX ERROR: Corrected line 149 from your screenshot ---
+                # FIXED SYNTAX ERROR FROM LINE 149
                 if new_pass:
                     st.session_state.users_db.at[idx, 'Password'] = new_pass
                 st.success("Profile Updated!")
@@ -130,16 +130,16 @@ with tabs[0]: # HOME
                     with st.container(border=True):
                         st.markdown("#### 🛠️ 1. Settings & Mapping")
                         st.selectbox("Select Bank Format", ["SBI", "HDFC", "ICICI", "Other"])
-                        # Internal text forced to black for visibility
+                        # VISIBILITY FIXED: master.html uploader text is now black
                         up_html = st.file_uploader("Upload Tally Master (master.html)", type=['html'])
-                        ledgers = get_ledger_names(up_html) if up_html else ["Cash", "Bank", "Suspense A/c"]
+                        ledgers = get_ledger_names(up_html) if up_html else ["Cash", "Bank"]
                         st.selectbox("Select Bank Ledger", ledgers)
                         st.selectbox("Select Default Party", ledgers)
                 with col2:
                     with st.container(border=True):
                         st.markdown("#### 📂 2. Upload & Convert")
-                        # Internal text forced to black for visibility
-                        st.file_uploader("Drop your Statement here", type=['pdf', 'xlsx'])
+                        # VISIBILITY FIXED: Statement uploader text is now black
+                        st.file_uploader("Drop your Bank Statement here", type=['pdf', 'xlsx'])
                         st.button("🚀 Process & Generate XML")
             else:
                 st.warning("⚠️ Trial Mode: Please contact Admin for Full Access.")
@@ -161,7 +161,7 @@ with tabs[3]: # LOGIN
             st.rerun()
         else: st.error("Invalid credentials.")
 
-# --- 6. PINNED GLOBAL FOOTER ---
+# --- 6. FOOTER ---
 st.markdown(f"""
     <div class="footer">
         <p>Sponsored By <b>Uday Mondal</b> | Powered & Created by <b>Debasish Biswas</b></p>
