@@ -25,7 +25,7 @@ if 'logged_in' not in st.session_state:
     st.session_state.logged_in = False
     st.session_state.current_user = None
 
-# --- 3. CAELUM-STYLE CSS (NAVBAR & TABS) ---
+# --- 3. CLEAN CSS (NO BACKGROUND HERO) ---
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
@@ -38,10 +38,10 @@ st.markdown("""
 
         /* --- NAVBAR / TABS STYLING --- */
         .stTabs {
-            background-color: #0044CC; /* Caelum Blue */
+            background-color: #0044CC; /* Caelum Blue Navbar */
             padding-top: 10px;
             padding-bottom: 0px;
-            margin-top: -6rem; /* Pull to very top */
+            margin-top: -6rem; 
             position: sticky;
             top: 0;
             z-index: 999;
@@ -49,7 +49,7 @@ st.markdown("""
 
         .stTabs [data-baseweb="tab-list"] {
             gap: 25px;
-            justify-content: flex-end; /* Align tabs to the right like a menu */
+            justify-content: flex-end;
             padding-right: 50px;
         }
 
@@ -70,37 +70,52 @@ st.markdown("""
         .stTabs [aria-selected="true"] {
             background-color: transparent !important;
             color: #FFFFFF !important;
-            border-bottom: 4px solid #4ADE80; /* Green Active Indicator */
+            border-bottom: 4px solid #4ADE80;
             font-weight: 700;
         }
 
-        /* --- HERO SECTION --- */
+        /* --- HERO SECTION (CLEAN - NO BACKGROUND) --- */
         .hero-section {
-            background-color: #0044CC; /* Match Navbar Blue */
-            color: white;
-            padding: 40px 80px 80px 80px;
-            margin: 0 -4rem 30px -4rem;
+            background-color: transparent; /* Removed Blue Background */
+            padding: 40px 0px 40px 0px;
+            margin-bottom: 20px;
             display: flex;
             align-items: center;
             justify-content: space-between;
+            border-bottom: 1px solid #E2E8F0; /* Subtle separator */
         }
         
-        .hero-title { font-size: 3.5rem; font-weight: 800; line-height: 1.1; margin-bottom: 20px; }
-        .hero-subtitle { font-size: 1.1rem; opacity: 0.9; margin-bottom: 30px; max-width: 600px; }
+        /* Title is now Blue to be visible on white */
+        .hero-title { 
+            font-size: 3.5rem; 
+            font-weight: 800; 
+            line-height: 1.1; 
+            margin-bottom: 20px; 
+            color: #0044CC; 
+        }
+        
+        /* Subtitle is dark gray */
+        .hero-subtitle { 
+            font-size: 1.1rem; 
+            color: #475569; 
+            margin-bottom: 30px; 
+            max-width: 600px; 
+            line-height: 1.6;
+        }
         
         /* CARD STYLING */
         .stContainer {
             background-color: white;
             padding: 30px;
             border-radius: 12px;
-            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);
             border: 1px solid #E2E8F0;
         }
         
         /* Buttons */
         div[data-testid="stButton"] button {
-             background-color: #4ADE80; /* Caelum Green */
-             color: #0044CC; /* Blue Text */
+             background-color: #4ADE80; 
+             color: #0044CC; 
              font-weight: 700;
              border-radius: 50px;
              border: none;
@@ -115,10 +130,11 @@ st.markdown("""
         .login-warning {
             text-align: center;
             padding: 40px;
-            background-color: #EFF6FF;
-            border: 2px dashed #0044CC;
+            background-color: #FFF1F2; /* Light Red */
+            border: 1px dashed #E11D48;
             border-radius: 12px;
             margin-top: 20px;
+            color: #9F1239;
         }
         
         /* Footer */
@@ -234,7 +250,7 @@ tabs = st.tabs(["Home", "Solutions", "Pricing", "User Management"])
 
 # --- TAB 1: HOME (CONVERTER) ---
 with tabs[0]:
-    # Hero Section
+    # Hero Section with Logo
     try: hero_logo_b64 = get_img_as_base64("logo.png")
     except: hero_logo_b64 = None
     hero_img_html = f'<img src="data:image/png;base64,{hero_logo_b64}" style="max-width: 100%; animation: float 6s ease-in-out infinite;">' if hero_logo_b64 else ""
@@ -252,7 +268,7 @@ with tabs[0]:
         </div>
     """, unsafe_allow_html=True)
 
-    # --- RESTRICT ACCESS: ONLY SHOW TOOL IF LOGGED IN ---
+    # --- RESTRICT ACCESS ---
     if st.session_state.logged_in:
         col_left, col_right = st.columns([1, 1.5], gap="large")
         
