@@ -278,7 +278,7 @@ with st.container(border=True):
 # Footer
 st.markdown("""
     <div class="footer">
-        <p>Powered & Created by <b>Accounting Expert</b> | Professional Tally Automation</p>
+        <p>Powered & Created by <b>Debasish Biswas</b> | Professional Tally Automation</p>
         <p style="font-size: 12px; margin-top: 5px;">Sponsored By Uday Mondal | Consultanat Advocate</p>
     </div>
 """, unsafe_allow_html=True)
