@@ -8,7 +8,7 @@ import io
 # --- 1. CONFIGURATION & STYLING ---
 st.set_page_config(
     page_title="Accounting Expert",
-    page_icon="📊",
+    page_icon="logo.png",
     layout="wide",
     initial_sidebar_state="expanded"
 )
