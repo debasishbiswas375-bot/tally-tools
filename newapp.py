@@ -40,7 +40,7 @@ st.markdown(f"""
 
         /* LOGO: UPPER LEFT CORNER ADJUSTED */
         .top-left-logo {{
-            position: fixed; left: 30px; top: 15px; width: 125px; z-index: 10001;
+            position: fixed; left: 30px; top: 5px; width: 115px; z-index: 10001;
         }}
 
         /* FORCE ALL TEXTS TO WHITE */
