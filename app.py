@@ -80,7 +80,7 @@ def load_data(file):
 # --- 4. UI DASHBOARD ---
 h_logo = get_img_as_base64("logo.png")
 h_html = f'<img src="data:image/png;base64,{h_logo}" width="100">' if h_logo else ""
-st.markdown(f'<div class="hero-container">{h_html}<h1>Accounting Expert</h1><p>Master-First AI Trace Engine</p></div>', unsafe_allow_html=True)
+st.markdown(f'<div class="hero-container">{h_html}<h1>Accounting Expert</h1><p>Auto-Select Bank Ledger Logic</p></div>', unsafe_allow_html=True)
 
 c1, c2 = st.columns([1, 1.5], gap="large")
 
@@ -91,10 +91,10 @@ with c1:
     if master:
         synced = extract_ledger_names(master)
         st.success(f"✅ Synced {len(synced)} ledgers")
-        options = ["⭐ AI Auto-Trace"] + synced
+        options = ["⭐ AI Auto-Trace (Bank)"] + synced
     
     bank_led_choice = st.selectbox("Select Bank Ledger", options)
-    party_led_choice = st.selectbox("Select Party Ledger", options)
+    party_led_choice = st.selectbox("Select Party Ledger", ["⭐ AI Auto-Trace (Party)"] + (synced if synced else []))
 
 with c2:
     st.markdown("### 📂 2. Convert")
@@ -103,17 +103,22 @@ with c2:
     if bank_file and master:
         df = load_data(bank_file)
         if df is not None:
-            # AI BANK TRACE LOGIC
+            # --- AI BANK TRACE LOGIC ---
             active_bank = bank_led_choice
-            if bank_led_choice == "⭐ AI Auto-Trace":
+            if bank_led_choice == "⭐ AI Auto-Trace (Bank)":
+                # Combine headers and first rows to detect BOB 138
                 sample_text = " ".join(df.head(10).astype(str).values.flatten()).upper()
-                # Specifically check for BOB keywords from your document
-                if "BOB" in sample_text or "BARODA" in sample_text:
-                    detected_bank = next((l for l in synced if "BOB" in l.upper() or "BARODA" in l.upper()), None)
+                
+                # Check for BOB specific patterns
+                if any(k in sample_text for k in ["BOB", "BARODA", "138"]):
+                    detected_bank = next((l for l in synced if any(k in l.upper() for k in ["BOB", "BARODA", "138"])), None)
                     if detected_bank:
                         active_bank = detected_bank
-                        st.info(f"🏦 **AI Auto-Trace Detected:** {active_bank}")
-                
+                        st.info(f"🏦 **AI Auto-Detected Bank:** {active_bank}")
+                    else:
+                        st.warning("⚠️ BOB 138 detected in file, but not found in your Master.html.")
+                        active_bank = st.selectbox("Please manually select the BOB Ledger:", synced)
+            
             # --- UNTRACED UPI VALIDATION ---
             n_c = next((c for c in df.columns if 'NARRATION' in str(c) or 'DESCRIPTION' in str(c)), df.columns[1])
             unmatched_upi_indices = []
@@ -129,7 +134,7 @@ with c2:
                 chosen_led = st.selectbox("Assign untraced UPIs to:", synced)
                 
                 if st.button("🚀 Process & Generate XML"):
-                    st.success(f"Verified! All UPI transactions mapped to {chosen_led}.")
+                    st.success(f"Processing XML with Bank: {active_bank}")
                     st.download_button("⬇️ Download tally_import.xml", "XML_CONTENT", file_name="tally_import.xml")
             else:
                 st.dataframe(df.head(5), use_container_width=True)
