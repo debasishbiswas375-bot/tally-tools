@@ -15,22 +15,17 @@ st.set_page_config(
     initial_sidebar_state="expanded" 
 )
 
-# --- 2. THEME & CSS (MATCHING SIDEBAR COLOR) ---
+# --- 2. THEME & CSS ---
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
         html, body, [class*="css"] { font-family: 'Inter', sans-serif; background-color: #F8FAFC; }
         
-        /* SIDEBAR DEEP NAVY THEME */
-        [data-testid="stSidebar"] {
-            background-color: #0F172A !important;
-            color: white !important;
-        }
+        [data-testid="stSidebar"] { background-color: #0F172A !important; color: white !important; }
         [data-testid="stSidebar"] * { color: white !important; }
         .sidebar-logo-text { font-size: 1.5rem; font-weight: 800; color: #10B981; margin-bottom: 20px; text-align: center; }
         .sidebar-footer-text { font-size: 12px; color: #94A3B8; text-align: center; margin-top: 30px; }
 
-        /* HERO GRADIENT (GREEN TO BLUE) */
         .hero-container {
             text-align: center; padding: 50px 20px;
             background: linear-gradient(135deg, #065F46 0%, #1E40AF 100%);
@@ -38,11 +33,9 @@ st.markdown("""
             box-shadow: 0 10px 30px -10px rgba(6, 95, 70, 0.5);
         }
         
-        /* CARD DESIGN */
         .stContainer { background-color: white; padding: 25px; border-radius: 16px; border: 1px solid #E2E8F0; margin-bottom: 20px; }
         h3 { border-left: 5px solid #10B981; padding-left: 12px; font-weight: 700 !important; color: #1e293b !important; }
 
-        /* BUTTONS */
         .stButton>button { 
             width: 100%; background: linear-gradient(90deg, #10B981, #3B82F6); 
             color: white; border-radius: 8px; height: 50px; font-weight: 700; border: none;
@@ -52,12 +45,33 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. HELPER FUNCTIONS ---
+# --- 3. HELPER & LOGIC FUNCTIONS ---
 
 def get_img_as_base64(file):
     try:
         with open(file, "rb") as f: return base64.b64encode(f.read()).decode()
     except: return None
+
+def clean_currency(value):
+    if pd.isna(value) or value == '': return 0.0
+    val = re.sub(r'[^\d.]', '', str(value))
+    try: return float(val)
+    except: return 0.0
+
+def trace_ledger(narration, master_ledgers):
+    """
+    Identity-First Tracing: Matches ledger names from your Tally Master 
+    to the bank narration using strict word boundaries.
+    """
+    if not narration or not master_ledgers: return None
+    # Sort ledgers by length (descending) to match 'Mithu Mondal' before 'Mithu'
+    sorted_masters = sorted([str(m) for m in master_ledgers], key=len, reverse=True)
+    for ledger in sorted_masters:
+        if len(ledger) < 3: continue
+        pattern = r'\b' + re.escape(ledger) + r'\b'
+        if re.search(pattern, str(narration), re.IGNORECASE):
+            return ledger
+    return None
 
 def smart_normalize(df):
     """Aggressive header detection to fix 'Empty Columns' issue."""
@@ -85,18 +99,61 @@ def smart_normalize(df):
     }
     for target, aliases in col_map.items():
         found = next((c for c in df.columns if any(a in c for a in aliases)), None)
-        new_df[target] = df[found] if found else (0.0 if target in ['Debit', 'Credit'] else "UNTRACED")
+        if found:
+            new_df[target] = df[found]
+        else:
+            new_df[target] = 0.0 if target in ['Debit', 'Credit'] else ""
+    
+    new_df['Debit'] = new_df['Debit'].apply(clean_currency)
+    new_df['Credit'] = new_df['Credit'].apply(clean_currency)
     return new_df.dropna(subset=['Date'])
 
-# --- 4. PERSISTENT SIDEBAR (LOGO, TITLE, HUB, SPONSOR) ---
+def generate_tally_xml(df, bank_ledger):
+    """Generates Tally-compliant XML with balanced Debit/Credit entries."""
+    xml_header = """<ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>Vouchers</REPORTNAME></REQUESTDESC><REQUESTDATA>"""
+    xml_footer = """</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>"""
+    body = ""
+    
+    for _, row in df.iterrows():
+        amt = row['Debit'] if row['Debit'] > 0 else row['Credit']
+        if amt <= 0: continue
+        vch_type = "Payment" if row['Debit'] > 0 else "Receipt"
+        
+        # Determine Ledger directions (Cr is negative in Tally XML)
+        l1, l1_amt = (row['Final Ledger'], amt) if vch_type == "Payment" else (bank_ledger, amt)
+        l2, l2_amt = (bank_ledger, -amt) if vch_type == "Payment" else (row['Final Ledger'], -amt)
+
+        try: d = pd.to_datetime(row['Date'], dayfirst=True).strftime("%Y%m%d")
+        except: d = "20260401"
+        
+        nar = str(row['Narration']).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+        
+        body += f"""<TALLYMESSAGE xmlns:UDF="TallyUDF">
+         <VOUCHER VCHTYPE="{vch_type}" ACTION="Create">
+          <DATE>{d}</DATE>
+          <NARRATION>{nar}</NARRATION>
+          <VOUCHERTYPENAME>{vch_type}</VOUCHERTYPENAME>
+          <ALLLEDGERENTRIES.LIST>
+           <LEDGERNAME>{l1}</LEDGERNAME>
+           <ISDEEMEDPOSITIVE>{"Yes" if l1_amt > 0 else "No"}</ISDEEMEDPOSITIVE>
+           <AMOUNT>{-l1_amt}</AMOUNT>
+          </ALLLEDGERENTRIES.LIST>
+          <ALLLEDGERENTRIES.LIST>
+           <LEDGERNAME>{l2}</LEDGERNAME>
+           <ISDEEMEDPOSITIVE>{"Yes" if l2_amt > 0 else "No"}</ISDEEMEDPOSITIVE>
+           <AMOUNT>{-l2_amt}</AMOUNT>
+          </ALLLEDGERENTRIES.LIST>
+         </VOUCHER>
+        </TALLYMESSAGE>"""
+    return xml_header + body + xml_footer
+
+# --- 4. PERSISTENT SIDEBAR ---
 with st.sidebar:
-    # Sidebar Logo and Title
     side_logo_b64 = get_img_as_base64("logo.png")
     if side_logo_b64:
         st.markdown(f'<div style="text-align:center;"><img src="data:image/png;base64,{side_logo_b64}" width="100"></div>', unsafe_allow_html=True)
     st.markdown('<div class="sidebar-logo-text">Accounting Expert</div>', unsafe_allow_html=True)
     
-    # Hub Sections
     with st.expander("👤 User Account", expanded=True):
         st.write("Status: **Online**")
         st.write("User: **Debasish**")
@@ -105,9 +162,8 @@ with st.sidebar:
         st.write("Plan: **Pro Tier**")
     
     with st.expander("❓ Help & Support"):
-        st.write("WhatsApp: +91 900XXXXXXX")
+        st.write("WhatsApp: +91 9002043666")
 
-    # Sidebar Footer (Sponsor Info)
     st.markdown('<div style="height: 80px;"></div>', unsafe_allow_html=True)
     footer_logo_b64 = get_img_as_base64("logo 1.png")
     footer_logo_html = f'<img src="data:image/png;base64,{footer_logo_b64}" width="20" style="vertical-align: middle;">' if footer_logo_b64 else ""
@@ -168,13 +224,22 @@ with col_right:
                 df_clean = smart_normalize(df_raw)
                 
                 if not df_clean.empty and 'Date' in df_clean.columns:
+                    # Apply Auto-Trace logic using the Synced Ledgers
+                    df_clean['Final Ledger'] = df_clean['Narration'].apply(lambda x: trace_ledger(x, ledger_list) or part_led)
+                    
                     status.update(label="✅ Analysis Complete!", state="complete")
-                    st.write("**Preview:**")
-                    st.dataframe(df_clean[['Date', 'Narration', 'Debit', 'Credit']].head(10), use_container_width=True)
+                    st.write("**Data Preview:**")
+                    st.dataframe(df_clean[['Date', 'Narration', 'Final Ledger', 'Debit', 'Credit']].head(10), use_container_width=True)
                     
                     if st.button("🚀 GENERATE XML"):
+                        xml_output = generate_tally_xml(df_clean, bank_led)
                         st.balloons()
-                        # XML Download Logic would go here
+                        st.download_button(
+                            label="⬇️ Download Tally XML",
+                            data=xml_output,
+                            file_name="tally_import.xml",
+                            mime="application/xml"
+                        )
                 else:
                     status.update(label="❌ Detection Failed", state="error")
                     st.error("I couldn't find the Date/Narration headers. Please check the PDF format.")
