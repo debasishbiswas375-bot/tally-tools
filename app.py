@@ -22,87 +22,108 @@ def get_img_as_base64(file):
             return base64.b64encode(f.read()).decode()
     except: return None
 
-# --- 3. PREMIUM UI & FAST LOADING CSS ---
+# --- 3. PREMIUM UI & LOADING CSS ---
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
         html, body, [class*="css"] { font-family: 'Inter', sans-serif; background-color: #F8FAFC; }
-        .hero-container { text-align: center; padding: 50px 20px; background: linear-gradient(135deg, #065F46 0%, #1E40AF 100%); color: white; margin: -6rem -4rem 30px -4rem; }
-        .bank-detect-box { background-color: #E0F2FE; border: 1px solid #3B82F6; padding: 15px; border-radius: 12px; color: #1E3A8A; font-weight: 700; margin-bottom: 20px; text-align: center; border-left: 8px solid #3B82F6; }
-        .warning-box { background-color: #FEF2F2; border: 1px solid #EF4444; padding: 15px; border-radius: 10px; margin: 15px 0; color: #991B1B; font-weight: 600; border-left: 8px solid #EF4444; }
-        .stButton>button { width: 100%; background: #10B981; color: white; height: 55px; font-weight: 600; border-radius: 12px; border: none; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3); }
-        .footer { position: fixed; left: 0; bottom: 0; width: 100%; background-color: white; color: #64748B; text-align: center; padding: 12px 0; border-top: 1px solid #E2E8F0; z-index: 1000; font-size: 0.9rem; }
+        
+        .hero-container { 
+            text-align: center; padding: 50px 20px; 
+            background: linear-gradient(135deg, #065F46 0%, #1E40AF 100%); 
+            color: white; margin: -6rem -4rem 30px -4rem; 
+        }
+        
+        .bank-detect-box { 
+            background-color: #E0F2FE; border: 1px solid #3B82F6; 
+            padding: 15px; border-radius: 12px; color: #1E3A8A; 
+            font-weight: 700; margin-bottom: 20px; text-align: center; border-left: 8px solid #3B82F6; 
+        }
+        
+        .warning-box { 
+            background-color: #FEF2F2; border: 1px solid #EF4444; 
+            padding: 15px; border-radius: 10px; margin: 15px 0; 
+            color: #991B1B; font-weight: 600; border-left: 8px solid #EF4444; 
+        }
+        
+        .stButton>button { 
+            width: 100%; background: #10B981; color: white; 
+            height: 55px; font-weight: 600; border-radius: 12px; 
+            border: none; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3); 
+        }
+        
+        .footer { 
+            position: fixed; left: 0; bottom: 0; width: 100%; 
+            background-color: white; color: #64748B; text-align: center; 
+            padding: 12px 0; border-top: 1px solid #E2E8F0; z-index: 1000; font-size: 0.9rem; 
+        }
+        
         .main-content { padding-bottom: 120px; }
         #MainMenu, footer, header { visibility: hidden; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 4. OPTIMIZED TRACE ENGINE ---
+# --- 4. CORE ENGINES (Optimized & Fixed Trace) ---
 
 @st.cache_data
 def extract_ledger_names(html_file):
     try:
         soup = BeautifulSoup(html_file, 'html.parser')
-        # Efficiently pull unique ledger names
+        # Sort by length (descending) so 'Medplus Sahanagar' is checked before 'Saha'
         return sorted(list(set([td.text.strip() for td in soup.find_all('td') if len(td.text.strip()) > 1])), key=len, reverse=True)
     except: return []
 
-def trace_identity_fast(narration, sorted_masters):
-    """Optimized for speed: Uses pre-sorted list to find specific names first."""
+def trace_identity_strict(narration, sorted_masters):
+    """STRICT TRACE: Uses word boundaries to distinguish Saha from Sahanagar and alerts for UPI."""
     if not narration or pd.isna(narration): return "Suspense", "None"
     nar_up = str(narration).upper()
     
+    # 1. Try to find a direct match from your 818 ledgers
     for ledger in sorted_masters:
-        if ledger.upper() in nar_up:
+        # \b ensures we match the whole word only (prevents Saha matching Sahanagar)
+        pattern = rf"\b{re.escape(ledger.upper())}\b"
+        if re.search(pattern, nar_up):
             return ledger, "🎯 Direct Match"
             
-    if "UPI" in nar_up: return "Untraced", "⚠️ UPI Alert"
+    # 2. If no match found, check for UPI keywords to trigger alert
+    if any(k in nar_up for k in ["UPI", "VPA", "G-PAY", "PHONEPE"]): 
+        return "Untraced", "⚠️ UPI Alert"
+        
     return "Suspense", "None"
 
 def generate_tally_xml(df, bank_led, synced, upi_fix_led=None):
-    """Turbo XML Engine with Tally Prime Validation"""
+    """Engine to create Tally Prime Import File"""
     xml_header = '<?xml version="1.0" encoding="UTF-8"?><ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>Vouchers</REPORTNAME></REQUESTDESC><REQUESTDATA>'
     xml_footer = '</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>'
     xml_body = ""
     
-    # Pre-compiled regex for speed
     n_c = next((c for c in df.columns if any(k in str(c) for k in ['NARRATION', 'DESC'])), df.columns[1])
     dr_c = next((c for c in df.columns if any(k in str(c) for k in ['WITHDRAWAL', 'DEBIT'])), None)
     cr_c = next((c for c in df.columns if any(k in str(c) for k in ['DEPOSIT', 'CREDIT'])), None)
     d_c = next((c for c in df.columns if 'DATE' in str(c)), df.columns[0])
 
-    progress_bar = st.progress(0)
-    total_rows = len(df)
-
-    for i, row in df.iterrows():
+    for _, row in df.iterrows():
         try:
             nar = str(row[n_c]).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
             dt = pd.to_datetime(row[d_c]).strftime('%Y%m%d')
             val_dr = float(str(row.get(dr_c, 0)).replace(',', '')) if dr_c and row[dr_c] else 0
             val_cr = float(str(row.get(cr_c, 0)).replace(',', '')) if cr_c and row[cr_c] else 0
             
-            target, status = trace_identity_fast(nar, synced)
+            target, status = trace_identity_strict(nar, synced)
             if status == "⚠️ UPI Alert" and upi_fix_led: target = upi_fix_led
             
             if val_dr > 0:
                 xml_body += f"""<TALLYMESSAGE xmlns:UDF="TallyUDF"><VOUCHER VCHTYPE="Payment" ACTION="Create"><DATE>{dt}</DATE><NARRATION>{nar}</NARRATION><VOUCHERTYPENAME>Payment</VOUCHERTYPENAME><ALLLEDGERENTRIES.LIST><LEDGERNAME>{target}</LEDGERNAME><ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE><AMOUNT>-{val_dr}</AMOUNT></ALLLEDGERENTRIES.LIST><ALLLEDGERENTRIES.LIST><LEDGERNAME>{bank_led}</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>{val_dr}</AMOUNT></ALLLEDGERENTRIES.LIST></VOUCHER></TALLYMESSAGE>"""
             elif val_cr > 0:
                 xml_body += f"""<TALLYMESSAGE xmlns:UDF="TallyUDF"><VOUCHER VCHTYPE="Receipt" ACTION="Create"><DATE>{dt}</DATE><NARRATION>{nar}</NARRATION><VOUCHERTYPENAME>Receipt</VOUCHERTYPENAME><ALLLEDGERENTRIES.LIST><LEDGERNAME>{bank_led}</LEDGERNAME><ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE><AMOUNT>-{val_cr}</AMOUNT></ALLLEDGERENTRIES.LIST><ALLLEDGERENTRIES.LIST><LEDGERNAME>{target}</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>{val_cr}</AMOUNT></ALLLEDGERENTRIES.LIST></VOUCHER></TALLYMESSAGE>"""
-            
-            if i % 10 == 0: progress_bar.progress((i + 1) / total_rows)
         except: continue
-    
-    progress_bar.empty()
     return xml_header + xml_body + xml_footer
 
 def load_data(file):
     try:
         if file.name.lower().endswith('.pdf'):
             with pdfplumber.open(file) as pdf:
-                all_data = []
-                for page in pdf.pages:
-                    table = page.extract_table()
-                    if table: all_data.extend(table)
+                all_data = [row for page in pdf.pages for row in (page.extract_table() or [])]
             df = pd.DataFrame(all_data)
         else:
             df = pd.read_excel(file, header=None)
@@ -118,7 +139,7 @@ def load_data(file):
 # --- 5. UI DASHBOARD ---
 l_top = get_img_as_base64("logo.png")
 l_top_h = f'<img src="data:image/png;base64,{l_top}" width="80" style="margin-bottom:10px;">' if l_top else ""
-st.markdown(f'<div class="hero-container">{l_top_h}<h1>Accounting Expert</h1><p>High-Speed AI Trace Engine</p></div>', unsafe_allow_html=True)
+st.markdown(f'<div class="hero-container">{l_top_h}<h1>Accounting Expert</h1><p>Strict Identity & UPI Alert Engine</p></div>', unsafe_allow_html=True)
 
 st.markdown('<div class="main-content">', unsafe_allow_html=True)
 c1, c2 = st.columns([1, 1.5], gap="large")
@@ -144,14 +165,15 @@ with c2:
             st.markdown(f'<div class="bank-detect-box">🏦 Bank Account: <b>{active_bank}</b></div>', unsafe_allow_html=True)
             
             n_c = next((c for c in df.columns if any(k in str(c) for k in ['NARRATION', 'DESC'])), df.columns[1])
-            unmatched = [idx for idx, r in df.iterrows() if trace_identity_fast(r[n_c], synced)[1] == "⚠️ UPI Alert"]
+            unmatched_upi = [idx for idx, r in df.iterrows() if trace_identity_strict(r[n_c], synced)[1] == "⚠️ UPI Alert"]
             
             st.write("**Smart Identity Preview:**")
-            st.table([{"Narration": str(row[n_c])[:50], "Target": trace_identity_fast(row[n_c], synced)[0]} for _, row in df.head(5).iterrows()])
+            st.table([{"Narration": str(row[n_c])[:50], "Target": trace_identity_strict(row[n_c], synced)[0], "Status": trace_identity_strict(row[n_c], synced)[1]} for _, row in df.head(10).iterrows()])
 
-            if len(unmatched) > 5:
-                st.markdown(f'<div class="warning-box">⚠️ Action Required: Found {len(unmatched)} Untraced Items!</div>', unsafe_allow_html=True)
-                upi_fix = st.selectbox("Assign Untraced to:", synced)
+            # --- DYNAMIC ALERT LOGIC ---
+            if len(unmatched_upi) > 0:
+                st.markdown(f'<div class="warning-box">🚨 UPI ALERT: Found {len(unmatched_upi)} transactions not in your Tally Master.</div>', unsafe_allow_html=True)
+                upi_fix = st.selectbox("Assign these unknown UPIs to:", synced)
                 if st.button("🚀 Process & Generate Tally XML"):
                     with st.status("⚡ Turbo-Tracing transactions...", expanded=True) as status:
                         xml = generate_tally_xml(df, active_bank, synced, upi_fix)
