@@ -12,7 +12,7 @@ st.set_page_config(
     page_title="Accounting Expert | AI Bank to Tally", 
     page_icon="logo.png",
     layout="wide",
-    initial_sidebar_state="expanded" #
+    initial_sidebar_state="expanded" 
 )
 
 # --- 2. THEME & CSS ---
@@ -24,16 +24,14 @@ st.markdown("""
         [data-testid="stSidebar"] { background-color: #0F172A !important; color: white !important; }
         [data-testid="stSidebar"] * { color: white !important; }
         .sidebar-logo-text { font-size: 1.5rem; font-weight: 800; color: #10B981; margin-bottom: 20px; text-align: center; }
-        .sidebar-footer-text { font-size: 12px; color: #94A3B8; text-align: center; margin-top: 30px; }
-
-        /* THE MAXIMIZE BUTTON FIX */
-        /* Makes the small (>) arrow visible and green when sidebar is hidden */
+        
+        /* MAXIMIZE BUTTON FIX */
         [data-testid="stSidebarCollapsedControl"] {
             background-color: #0F172A !important;
             color: #10B981 !important;
             border-radius: 0 8px 8px 0;
             border: 1px solid #10B981;
-            top: 10px;
+            top: 15px;
         }
 
         .hero-container {
@@ -79,12 +77,14 @@ def trace_ledger(narration, master_ledgers):
     return None
 
 def smart_normalize(df):
-    """Refined header detection and row cleaning."""
+    """FIXED: Uses list comprehension to safely handle None values and prevent AttributeError."""
     if df is None or df.empty: return pd.DataFrame()
-    df = df.dropna(how='all', axis=0).dropna(how='all', axis=1).reset_index(drop=True)
+    
+    df = df.dropna(how='all', axis=0).reset_index(drop=True)
     
     header_idx = None
     for i, row in df.iterrows():
+        # CRITICAL FIX: Ensure no None values are passed to .lower()
         clean_row = [str(v).lower().strip() for v in row.values if v is not None]
         row_str = " ".join(clean_row)
         if 'date' in row_str and ('narration' in row_str or 'particular' in row_str or 'desc' in row_str):
@@ -106,20 +106,15 @@ def smart_normalize(df):
     
     for target, aliases in col_map.items():
         found = next((c for c in df.columns if any(a in c for a in aliases)), None)
-        if found:
-            new_df[target] = df[found]
-        else:
-            new_df[target] = 0.0 if target in ['Debit', 'Credit'] else ""
+        new_df[target] = df[found] if found else (0.0 if target in ['Debit', 'Credit'] else "")
     
     new_df['Debit'] = new_df['Debit'].apply(clean_currency)
     new_df['Credit'] = new_df['Credit'].apply(clean_currency)
-    new_df['Narration'] = new_df['Narration'].fillna('').astype(str)
-    
     return new_df.dropna(subset=['Date'])
 
 def generate_tally_xml(df, bank_ledger):
-    """Strictly balanced XML generation."""
-    xml_header = """<ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>Vouchers</REQUESTDESC><REQUESTDATA>"""
+    """FIXED: Ensures balanced entries to stop Tally import errors."""
+    xml_header = """<ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>Vouchers</REPORTNAME></REQUESTDESC><REQUESTDATA>"""
     xml_footer = """</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>"""
     body = ""
     
@@ -128,11 +123,11 @@ def generate_tally_xml(df, bank_ledger):
         if amt <= 0: continue
         vch_type = "Payment" if row['Debit'] > 0 else "Receipt"
         
+        # Internal ledger logic
         l1, l1_amt = (row['Final Ledger'], amt) if vch_type == "Payment" else (bank_ledger, amt)
         l2, l2_amt = (bank_ledger, -amt) if vch_type == "Payment" else (row['Final Ledger'], -amt)
 
-        try: 
-            d = pd.to_datetime(row['Date'], dayfirst=True, errors='coerce').strftime("%Y%m%d") #
+        try: d = pd.to_datetime(row['Date'], dayfirst=True).strftime("%Y%m%d") #
         except: d = "20260401"
         
         nar = str(row['Narration']).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
@@ -141,15 +136,12 @@ def generate_tally_xml(df, bank_ledger):
          <VOUCHER VCHTYPE="{vch_type}" ACTION="Create">
           <DATE>{d}</DATE>
           <NARRATION>{nar}</NARRATION>
-          <VOUCHERTYPENAME>{vch_type}</VOUCHERTYPENAME>
           <ALLLEDGERENTRIES.LIST>
            <LEDGERNAME>{l1}</LEDGERNAME>
-           <ISDEEMEDPOSITIVE>{"Yes" if l1_amt > 0 else "No"}</ISDEEMEDPOSITIVE>
            <AMOUNT>{-l1_amt}</AMOUNT>
           </ALLLEDGERENTRIES.LIST>
           <ALLLEDGERENTRIES.LIST>
            <LEDGERNAME>{l2}</LEDGERNAME>
-           <ISDEEMEDPOSITIVE>{"Yes" if l2_amt > 0 else "No"}</ISDEEMEDPOSITIVE>
            <AMOUNT>{-l2_amt}</AMOUNT>
           </ALLLEDGERENTRIES.LIST>
          </VOUCHER>
@@ -164,39 +156,16 @@ with st.sidebar:
     st.markdown('<div class="sidebar-logo-text">Accounting Expert</div>', unsafe_allow_html=True)
     
     with st.expander("👤 User Account", expanded=True):
-        st.write("Status: **Online**")
         st.write("User: **Debasish**")
-    
-    with st.expander("💳 Solutions & Pricing"):
-        st.write("Plan: **Pro Tier**")
     
     with st.expander("❓ Help & Support"):
         st.write("WhatsApp: +91 9002043666")
 
-    st.markdown('<div style="height: 80px;"></div>', unsafe_allow_html=True)
-    footer_logo_b64 = get_img_as_base64("logo 1.png")
-    footer_logo_html = f'<img src="data:image/png;base64,{footer_logo_b64}" width="20" style="vertical-align: middle;">' if footer_logo_b64 else ""
-    
-    st.markdown(f"""
-        <div class="sidebar-footer-text">
-            Sponsored By {footer_logo_html} <b>Uday Mondal</b><br>
-            Consultant Advocate<br><br>
-            Created & Powered by<br><b>Debasish Biswas</b><br>
-            v2.1 Stable Build
-        </div>
-    """, unsafe_allow_html=True)
-
-# --- 5. MAIN DASHBOARD AREA ---
+# --- 5. MAIN DASHBOARD ---
 hero_logo_b64 = get_img_as_base64("logo.png")
-hero_logo_html = f'<img src="data:image/png;base64,{hero_logo_b64}" width="100" style="margin-bottom:15px;">' if hero_logo_b64 else ""
+hero_logo_html = f'<img src="data:image/png;base64,{hero_logo_b64}" width="100">' if hero_logo_b64 else ""
 
-st.markdown(f"""
-    <div class="hero-container">
-        {hero_logo_html}
-        <div style="font-size: 2.8rem; font-weight: 800;">Accounting Expert</div>
-        <div style="font-size: 1.1rem; opacity: 0.9;">Professional Smart AI Bank to Tally XML Automation</div>
-    </div>
-""", unsafe_allow_html=True)
+st.markdown(f"""<div class="hero-container">{hero_logo_html}<h1 style="font-size: 2.8rem; font-weight: 800;">Accounting Expert</h1></div>""", unsafe_allow_html=True)
 
 col_left, col_right = st.columns([1, 1.5], gap="large")
 
@@ -204,22 +173,19 @@ with col_left:
     with st.container():
         st.markdown("### 🛠️ 1. Settings")
         master = st.file_uploader("Upload Tally Master (HTML)", type=['html'])
-        ledger_list = ["Suspense A/c", "Cash", "Bank"]
+        ledger_list = ["Suspense A/c"]
         if master:
             soup = BeautifulSoup(master, 'html.parser')
-            extracted = sorted(list(set([t.text.strip() for t in soup.find_all('td') if t.text.strip()])))
-            if extracted: ledger_list = extracted; st.success(f"✅ {len(ledger_list)} Ledgers Synced")
-        
+            ledger_list = sorted(list(set([t.text.strip() for t in soup.find_all('td') if t.text.strip()])))
         bank_led = st.selectbox("Bank Ledger", ledger_list)
         part_led = st.selectbox("Default Party", ledger_list)
 
 with col_right:
     with st.container():
-        st.markdown("### 📂 2. Statement Processing")
+        st.markdown("### 📂 2. Conversion")
         stmt_file = st.file_uploader("Upload PDF or Excel", type=['pdf', 'xlsx'])
-        
         if stmt_file:
-            with st.status("🚀 AI Engine Processing...", expanded=True) as status:
+            with st.status("🚀 Processing...", expanded=True) as status:
                 if stmt_file.name.endswith('.pdf'):
                     with pdfplumber.open(stmt_file) as pdf:
                         data = []
@@ -231,23 +197,13 @@ with col_right:
                     df_raw = pd.read_excel(stmt_file)
 
                 df_clean = smart_normalize(df_raw)
-                
                 if not df_clean.empty and 'Date' in df_clean.columns:
                     df_clean['Final Ledger'] = df_clean['Narration'].apply(lambda x: trace_ledger(x, ledger_list) or part_led)
-                    
-                    status.update(label="✅ Analysis Complete!", state="complete")
-                    st.write("**Data Preview:**")
-                    st.dataframe(df_clean[['Date', 'Narration', 'Final Ledger', 'Debit', 'Credit']].head(10), use_container_width=True)
-                    
+                    status.update(label="✅ Ready!", state="complete")
+                    st.dataframe(df_clean.head(10), use_container_width=True)
                     if st.button("🚀 GENERATE XML"):
                         xml_output = generate_tally_xml(df_clean, bank_led)
-                        st.balloons()
-                        st.download_button(
-                            label="⬇️ Download Tally XML",
-                            data=xml_output,
-                            file_name="tally_import.xml",
-                            mime="application/xml"
-                        )
+                        st.download_button("⬇️ Download XML", xml_output, "tally_import.xml")
                 else:
                     status.update(label="❌ Detection Failed", state="error")
-                    st.error("I couldn't find the Date/Narration headers. Please check the PDF format.")
+                    st.error("Could not detect headers. Check your PDF format.")
