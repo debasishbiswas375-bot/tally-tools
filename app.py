@@ -5,6 +5,7 @@ import pdfplumber
 import re
 import base64
 import io
+import time
 
 # --- 1. PAGE CONFIG ---
 st.set_page_config(
@@ -14,55 +15,38 @@ st.set_page_config(
     initial_sidebar_state="expanded" 
 )
 
-# --- 2. SOLID UNIFIED THEME CSS ---
+# --- 2. THEME & CSS (MATCHING SIDEBAR COLOR) ---
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
+        html, body, [class*="css"] { font-family: 'Inter', sans-serif; background-color: #F8FAFC; }
         
-        /* Set everything to the same solid background color */
-        .stApp, [data-testid="stSidebar"], .main, .stSidebarContent, html, body {
+        /* SIDEBAR DEEP NAVY THEME */
+        [data-testid="stSidebar"] {
             background-color: #0F172A !important;
-            font-family: 'Inter', sans-serif;
-            color: #F8FAFC !important;
+            color: white !important;
         }
-
-        /* Hero Section - Solid with a subtle border instead of gradient */
-        .hero-container {
-            text-align: center; 
-            padding: 40px 20px;
-            background-color: #1E293B; 
-            color: white; 
-            margin: -6rem -4rem 30px -4rem;
-            border-bottom: 2px solid #10B981;
-        }
-        
-        /* Solid Input Areas */
-        .stContainer, div[data-testid="stVerticalBlock"] > div:has(div.stMarkdown) {
-            background-color: #1E293B !important;
-            padding: 25px; 
-            border-radius: 12px; 
-            border: 1px solid #334155;
-            margin-bottom: 20px;
-        }
-
-        /* Sidebar Logo and Text */
-        .sidebar-logo-text { font-size: 1.4rem; font-weight: 800; color: white; text-align: center; margin-bottom: 20px; }
+        [data-testid="stSidebar"] * { color: white !important; }
+        .sidebar-logo-text { font-size: 1.5rem; font-weight: 800; color: #10B981; margin-bottom: 20px; text-align: center; }
         .sidebar-footer-text { font-size: 12px; color: #94A3B8; text-align: center; margin-top: 30px; }
 
-        h1, h2, h3, p, span, label { color: white !important; }
-        h3 { border-left: 5px solid #10B981; padding-left: 12px; font-weight: 700 !important; }
-
-        /* Buttons */
-        .stButton>button { 
-            width: 100%; 
-            background: #10B981; 
-            color: white !important; 
-            border-radius: 8px; 
-            height: 50px; 
-            font-weight: 700; 
-            border: none;
+        /* HERO GRADIENT (GREEN TO BLUE) */
+        .hero-container {
+            text-align: center; padding: 50px 20px;
+            background: linear-gradient(135deg, #065F46 0%, #1E40AF 100%);
+            color: white; margin: -6rem -4rem 30px -4rem;
+            box-shadow: 0 10px 30px -10px rgba(6, 95, 70, 0.5);
         }
-        .stButton>button:hover { background: #059669; }
+        
+        /* CARD DESIGN */
+        .stContainer { background-color: white; padding: 25px; border-radius: 16px; border: 1px solid #E2E8F0; margin-bottom: 20px; }
+        h3 { border-left: 5px solid #10B981; padding-left: 12px; font-weight: 700 !important; color: #1e293b !important; }
+
+        /* BUTTONS */
+        .stButton>button { 
+            width: 100%; background: linear-gradient(90deg, #10B981, #3B82F6); 
+            color: white; border-radius: 8px; height: 50px; font-weight: 700; border: none;
+        }
         
         #MainMenu, footer, header {visibility: hidden;}
     </style>
@@ -76,7 +60,7 @@ def get_img_as_base64(file):
     except: return None
 
 def smart_normalize(df):
-    """Deep Scanner to find headers and prevent empty XML exports."""
+    """Aggressive header detection to fix 'Empty Columns' issue."""
     if df is None or df.empty: return pd.DataFrame()
     df = df.dropna(how='all').reset_index(drop=True)
     
@@ -95,7 +79,7 @@ def smart_normalize(df):
     new_df = pd.DataFrame()
     col_map = {
         'Date': ['date', 'txn', 'value'],
-        'Narration': ['narration', 'particular', 'description'],
+        'Narration': ['narration', 'particular', 'description', 'remarks'],
         'Debit': ['debit', 'withdrawal', 'out', 'dr'],
         'Credit': ['credit', 'deposit', 'in', 'cr']
     }
@@ -104,13 +88,15 @@ def smart_normalize(df):
         new_df[target] = df[found] if found else (0.0 if target in ['Debit', 'Credit'] else "UNTRACED")
     return new_df.dropna(subset=['Date'])
 
-# --- 4. PERSISTENT SIDEBAR ---
+# --- 4. PERSISTENT SIDEBAR (LOGO, TITLE, HUB, SPONSOR) ---
 with st.sidebar:
+    # Sidebar Logo and Title
     side_logo_b64 = get_img_as_base64("logo.png")
     if side_logo_b64:
-        st.markdown(f'<div style="text-align:center;"><img src="data:image/png;base64,{side_logo_b64}" width="120"></div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="text-align:center;"><img src="data:image/png;base64,{side_logo_b64}" width="100"></div>', unsafe_allow_html=True)
     st.markdown('<div class="sidebar-logo-text">Accounting Expert</div>', unsafe_allow_html=True)
     
+    # Hub Sections
     with st.expander("👤 User Account", expanded=True):
         st.write("Status: **Online**")
         st.write("User: **Debasish**")
@@ -119,10 +105,10 @@ with st.sidebar:
         st.write("Plan: **Pro Tier**")
     
     with st.expander("❓ Help & Support"):
-        st.write("WhatsApp: +91 9002043666")
+        st.write("WhatsApp: +91 900XXXXXXX")
 
-    # Sponsored Footer at bottom of Sidebar
-    st.markdown('<div style="height: 100px;"></div>', unsafe_allow_html=True)
+    # Sidebar Footer (Sponsor Info)
+    st.markdown('<div style="height: 80px;"></div>', unsafe_allow_html=True)
     footer_logo_b64 = get_img_as_base64("logo 1.png")
     footer_logo_html = f'<img src="data:image/png;base64,{footer_logo_b64}" width="20" style="vertical-align: middle;">' if footer_logo_b64 else ""
     
@@ -135,7 +121,7 @@ with st.sidebar:
         </div>
     """, unsafe_allow_html=True)
 
-# --- 5. MAIN DASHBOARD ---
+# --- 5. MAIN DASHBOARD AREA ---
 hero_logo_b64 = get_img_as_base64("logo.png")
 hero_logo_html = f'<img src="data:image/png;base64,{hero_logo_b64}" width="100" style="margin-bottom:15px;">' if hero_logo_b64 else ""
 
@@ -168,7 +154,7 @@ with col_right:
         stmt_file = st.file_uploader("Upload PDF or Excel", type=['pdf', 'xlsx'])
         
         if stmt_file:
-            with st.status("🚀 Processing with AI Engine...", expanded=False) as status:
+            with st.status("🚀 AI Engine Processing...", expanded=True) as status:
                 if stmt_file.name.endswith('.pdf'):
                     with pdfplumber.open(stmt_file) as pdf:
                         data = []
@@ -182,12 +168,13 @@ with col_right:
                 df_clean = smart_normalize(df_raw)
                 
                 if not df_clean.empty and 'Date' in df_clean.columns:
-                    status.update(label="✅ Ready!", state="complete")
+                    status.update(label="✅ Analysis Complete!", state="complete")
                     st.write("**Preview:**")
                     st.dataframe(df_clean[['Date', 'Narration', 'Debit', 'Credit']].head(10), use_container_width=True)
                     
                     if st.button("🚀 GENERATE XML"):
                         st.balloons()
+                        # XML Download Logic would go here
                 else:
                     status.update(label="❌ Detection Failed", state="error")
                     st.error("I couldn't find the Date/Narration headers. Please check the PDF format.")
