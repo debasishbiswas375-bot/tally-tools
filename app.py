@@ -7,18 +7,15 @@ import base64
 import re
 
 # --- 1. PAGE CONFIGURATION ---
-st.set_page_config(page_title="Accounting Expert", layout="wide", initial_sidebar_state="collapsed")
+st.set_config(page_title="Accounting Expert", layout="wide")
 
 # --- 2. PREMIUM UI CSS ---
 st.markdown("""
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
-        html, body, [class*="css"] { font-family: 'Inter', sans-serif; background-color: #F8FAFC; }
-        .hero-container { text-align: center; padding: 50px; background: linear-gradient(135deg, #065F46 0%, #1E40AF 100%); color: white; margin: -6rem -4rem 30px -4rem; }
+        .hero-container { text-align: center; padding: 40px; background: linear-gradient(135deg, #065F46 0%, #1E40AF 100%); color: white; margin: -6rem -4rem 30px -4rem; }
         .bank-detect-box { background-color: #E0F2FE; border: 2px solid #3B82F6; padding: 15px; border-radius: 10px; color: #1E3A8A; font-weight: 700; margin-bottom: 20px; text-align: center; }
-        .warning-box { background-color: #FEF2F2; border: 2px solid #EF4444; padding: 20px; border-radius: 12px; margin: 20px 0; color: #991B1B; }
-        .stButton>button { width: 100%; background: #10B981; color: white; height: 55px; font-weight: 600; border-radius: 8px; border: none; }
-        .footer { margin-top: 60px; padding: 40px; text-align: center; color: #64748B; border-top: 1px solid #E2E8F0; background-color: white; margin-left: -4rem; margin-right: -4rem; }
+        .stButton>button { width: 100%; background: #10B981; color: white; height: 55px; font-weight: 600; border: none; }
+        .footer { margin-top: 60px; padding: 30px; text-align: center; color: #64748B; border-top: 1px solid #E2E8F0; background-color: white; }
     </style>
 """, unsafe_allow_html=True)
 
@@ -31,28 +28,29 @@ def extract_ledger_names(html_file):
     except: return []
 
 def high_power_trace(narration, master_list):
-    """Deep Trace: Cleans UPI noise to find the actual Person/Party name."""
+    """
+    ULTRA-TRACE POWER:
+    Matches longest phrases first to prevent 'Mithu Sk' vs 'Mithu Mondal' errors.
+    """
     if not narration or pd.isna(narration): return "Suspense", "None"
+    nar_up = str(narration).upper().replace('/', ' ')
     
-    # Clean UPI noise (removes numbers, IDs, and symbols to isolate the name)
-    clean_nar = re.sub(r'[^a-zA-Z\s]', ' ', str(narration)).upper()
-    clean_nar = " ".join(clean_nar.split())
+    # Sort masters by length (longest names first) to ensure 'Mithu Mondal' 
+    # is checked before 'Mithu'
+    sorted_masters = sorted(master_list, key=len, reverse=True)
 
-    # Priority 1: Direct Master Match in cleaned narration
-    for ledger in master_list:
-        if ledger.upper() in clean_nar:
-            return ledger, "🎯 Direct Match"
-            
-    # Priority 2: Partial/Fuzzy search for UPI names
-    if "UPI" in str(narration).upper():
-        return "Untraced", "⚠️ UPI Alert"
-        
+    for ledger in sorted_masters:
+        pattern = rf"\b{re.escape(ledger.upper())}\b" # Matches exact phrase boundaries
+        if re.search(pattern, nar_up):
+            return ledger, "🎯 Exact Match"
+    
+    if "UPI" in nar_up: return "Untraced", "⚠️ UPI Alert"
     return "Suspense", "None"
 
 def load_data(file):
     try:
         df = pd.read_excel(file, header=None)
-        # Find header by looking for BOB Narration patterns
+        # Specifically targeting the BOB 138 layout
         for i, row in df.iterrows():
             row_str = " ".join([str(x).lower() for x in row if x])
             if 'narration' in row_str and 'tran date' in row_str:
@@ -61,8 +59,8 @@ def load_data(file):
         return None
     except: return None
 
-# --- 4. UI DASHBOARD ---
-st.markdown('<div class="hero-container"><h1>Accounting Expert</h1><p>Intelligent Party-Bank Separation Engine</p></div>', unsafe_allow_html=True)
+# --- 4. UI SECTIONS ---
+st.markdown('<div class="hero-container"><h1>Accounting Expert</h1></div>', unsafe_allow_html=True)
 c1, c2 = st.columns([1, 1.5], gap="large")
 
 with c1:
@@ -76,20 +74,20 @@ with c1:
 
 with c2:
     st.markdown("### 📂 2. Data Preview & Convert")
-    bank_file = st.file_uploader("Upload Statement", type=['xlsx', 'xls', 'pdf'])
+    bank_file = st.file_uploader("Upload Statement", type=['xlsx', 'xls'])
     
     if bank_file and master:
         df = load_data(bank_file)
         if df is not None:
-            # BANK AUTO-DETECTION (Identifies account holder bank)
+            # BANK AUTO-DETECTION (For BOB 138)
             active_bank = bank_choice
-            meta = str(df.iloc[:5].values).upper()
+            meta = str(df.iloc[:10].values).upper()
             if "BOB" in meta or "138" in meta:
                 active_bank = next((l for l in synced if "BOB" in l.upper() or "138" in l), bank_choice)
-                st.markdown(f'<div class="bank-detect-box">🏦 Auto-Detected Account: {active_bank}</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="bank-detect-box">🏦 Detected Bank: {active_bank}</div>', unsafe_allow_html=True)
 
-            # --- DATA PREVIEW: IDENTIFYING THE DIFFERENT PARTIES ---
-            st.markdown("### 📋 Smart Data Preview")
+            # DATA PREVIEW WITH IDENTITY ISOLATION
+            st.markdown("### 📋 Smart Identity Preview")
             n_c = next((c for c in df.columns if 'NARRATION' in str(c)), df.columns[1])
             
             preview_data = []
@@ -97,18 +95,17 @@ with c2:
             for idx, row in df.head(15).iterrows():
                 target, status = high_power_trace(row[n_c], synced)
                 if status == "⚠️ UPI Alert": unmatched_upi_indices.append(idx)
-                preview_data.append({"Statement Narration": str(row[n_c])[:60], "Tally Party Ledger": target, "Trace Power": status})
+                preview_data.append({"Narration": str(row[n_c])[:50], "Target Ledger": target, "Power": status})
             
-            st.table(preview_data) # This table now shows the specific person in the narration
+            st.table(preview_data) # Check this table to see Mithu Sk vs Mondal separation
 
             if len(unmatched_upi_indices) > 5:
-                st.markdown(f'<div class="warning-box">⚠️ Found {len(unmatched_upi_indices)} UPI transactions with unknown parties.</div>', unsafe_allow_html=True)
-                upi_fix = st.selectbox("Assign these unknown parties to:", synced)
+                st.markdown(f'<div class="warning-box">⚠️ {len(unmatched_upi_indices)} UPI items need manual assignment.</div>', unsafe_allow_html=True)
+                upi_fix = st.selectbox("Assign unknown UPIs to:", synced)
                 if st.button("🚀 Process & Create Tally XML"):
                     st.download_button("⬇️ Download tally_import.xml", "XML_CONTENT", file_name="tally_import.xml")
             else:
                 if st.button("🚀 Convert to Tally XML"):
                     st.download_button("⬇️ Download tally_import.xml", "XML_CONTENT", file_name="tally_import.xml")
 
-# --- 5. FOOTER ---
 st.markdown(f"""<div class="footer"><p>Sponsored By <b>Uday Mondal</b> | Advocate</p><p>Created by <b>Debasish Biswas</b></p></div>""", unsafe_allow_html=True)
