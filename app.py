@@ -53,18 +53,13 @@ def get_img_as_base64(file):
     except: return None
 
 def clean_currency(value):
-    if pd.isna(value) or value == '': return 0.0
+    if pd.isna(value) or value == '' or value is None: return 0.0
     val = re.sub(r'[^\d.]', '', str(value))
     try: return float(val)
     except: return 0.0
 
 def trace_ledger(narration, master_ledgers):
-    """
-    Identity-First Tracing: Matches ledger names from your Tally Master 
-    to the bank narration using strict word boundaries.
-    """
     if not narration or not master_ledgers: return None
-    # Sort ledgers by length (descending) to match 'Mithu Mondal' before 'Mithu'
     sorted_masters = sorted([str(m) for m in master_ledgers], key=len, reverse=True)
     for ledger in sorted_masters:
         if len(ledger) < 3: continue
@@ -74,13 +69,17 @@ def trace_ledger(narration, master_ledgers):
     return None
 
 def smart_normalize(df):
-    """Aggressive header detection to fix 'Empty Columns' issue."""
+    """Refined header detection and row cleaning."""
     if df is None or df.empty: return pd.DataFrame()
-    df = df.dropna(how='all').reset_index(drop=True)
+    
+    # Pre-clean: Remove completely empty rows and columns
+    df = df.dropna(how='all', axis=0).dropna(how='all', axis=1).reset_index(drop=True)
     
     header_idx = None
     for i, row in df.iterrows():
-        row_str = " ".join([str(v).lower() for v in row.values if v is not None])
+        # Clean row values for searching
+        clean_row = [str(v).lower().strip() for v in row.values if v is not None]
+        row_str = " ".join(clean_row)
         if 'date' in row_str and ('narration' in row_str or 'particular' in row_str or 'desc' in row_str):
             header_idx = i
             break
@@ -92,11 +91,12 @@ def smart_normalize(df):
     df.columns = df.columns.astype(str).str.strip().str.lower()
     new_df = pd.DataFrame()
     col_map = {
-        'Date': ['date', 'txn', 'value'],
-        'Narration': ['narration', 'particular', 'description', 'remarks'],
+        'Date': ['date', 'txn', 'value', 'tran'],
+        'Narration': ['narration', 'particular', 'description', 'remarks', 'details'],
         'Debit': ['debit', 'withdrawal', 'out', 'dr'],
         'Credit': ['credit', 'deposit', 'in', 'cr']
     }
+    
     for target, aliases in col_map.items():
         found = next((c for c in df.columns if any(a in c for a in aliases)), None)
         if found:
@@ -104,12 +104,15 @@ def smart_normalize(df):
         else:
             new_df[target] = 0.0 if target in ['Debit', 'Credit'] else ""
     
+    # Clean extracted data
     new_df['Debit'] = new_df['Debit'].apply(clean_currency)
     new_df['Credit'] = new_df['Credit'].apply(clean_currency)
+    new_df['Narration'] = new_df['Narration'].fillna('').astype(str)
+    
     return new_df.dropna(subset=['Date'])
 
 def generate_tally_xml(df, bank_ledger):
-    """Generates Tally-compliant XML with balanced Debit/Credit entries."""
+    """Strictly balanced XML generation."""
     xml_header = """<ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>Vouchers</REPORTNAME></REQUESTDESC><REQUESTDATA>"""
     xml_footer = """</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>"""
     body = ""
@@ -119,11 +122,13 @@ def generate_tally_xml(df, bank_ledger):
         if amt <= 0: continue
         vch_type = "Payment" if row['Debit'] > 0 else "Receipt"
         
-        # Determine Ledger directions (Cr is negative in Tally XML)
+        # Tally logic: Dr is positive, Cr is negative. We send -Amount to Tally tags
         l1, l1_amt = (row['Final Ledger'], amt) if vch_type == "Payment" else (bank_ledger, amt)
         l2, l2_amt = (bank_ledger, -amt) if vch_type == "Payment" else (row['Final Ledger'], -amt)
 
-        try: d = pd.to_datetime(row['Date'], dayfirst=True).strftime("%Y%m%d")
+        try: 
+            # Detect common Indian date formats
+            d = pd.to_datetime(row['Date'], dayfirst=True, errors='coerce').strftime("%Y%m%d")
         except: d = "20260401"
         
         nar = str(row['Narration']).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
@@ -224,7 +229,7 @@ with col_right:
                 df_clean = smart_normalize(df_raw)
                 
                 if not df_clean.empty and 'Date' in df_clean.columns:
-                    # Apply Auto-Trace logic using the Synced Ledgers
+                    # AI Tracing Logic
                     df_clean['Final Ledger'] = df_clean['Narration'].apply(lambda x: trace_ledger(x, ledger_list) or part_led)
                     
                     status.update(label="✅ Analysis Complete!", state="complete")
