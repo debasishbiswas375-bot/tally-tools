@@ -28,76 +28,88 @@ st.markdown("""
 
 # --- 3. CORE LOGIC ENGINE ---
 
+def get_img_as_base64(file):
+    try:
+        with open(file, "rb") as f: return base64.b64encode(f.read()).decode()
+    except: return None
+
 def extract_ledger_names(html_file):
-    """Reads Master.html and extracts real Tally ledger names."""
     try:
         soup = BeautifulSoup(html_file, 'html.parser')
         ledgers = [td.text.strip() for td in soup.find_all('td') if len(td.text.strip()) > 1]
         return sorted(list(set(ledgers)))
     except: return []
 
-def trace_ledger(remark, master_list):
-    """Premium AI Matching: Scans narration against synced ledgers."""
-    if not remark or pd.isna(remark): 
-        return "Suspense"
-    
-    remark_up = str(remark).upper()
+def trace_ledger(text, master_list):
+    """Fuzzy matching: returns ledger if found in text, else 'Suspense'."""
+    if not text or pd.isna(text): return "Suspense"
+    text_up = str(text).upper()
     for ledger in master_list:
-        if ledger.upper() in remark_up: 
-            return ledger
-            
+        if ledger.upper() in text_up: return ledger
     return "Suspense"
 
+# --- THE FIX: SMART LOADER FOR XLS, XLSX, AND PDF ---
 def load_data(file):
-    """Smart loader to handle PDF or Excel without crashing."""
-    if file.name.lower().endswith('.pdf'):
-        all_rows = []
-        with pdfplumber.open(file) as pdf:
-            for page in pdf.pages:
-                table = page.extract_table()
-                if table: all_rows.extend(table)
-        df = pd.DataFrame(all_rows)
-        # Find header row
-        for i, row in df.iterrows():
-            if any(k in str(row).lower() for k in ['date', 'txn', 'description', 'narration']):
-                df.columns = df.iloc[i]
-                return df[i+1:].reset_index(drop=True)
-        return df
-    return pd.read_excel(file)
+    fname = file.name.lower()
+    try:
+        if fname.endswith('.pdf'):
+            all_rows = []
+            with pdfplumber.open(file) as pdf:
+                for page in pdf.pages:
+                    table = page.extract_table()
+                    if table: all_rows.extend(table)
+            df = pd.DataFrame(all_rows)
+            for i, row in df.iterrows():
+                if any(k in str(row).lower() for k in ['date', 'txn', 'description', 'narration']):
+                    df.columns = df.iloc[i]
+                    return df[i+1:].reset_index(drop=True)
+            return df
+        elif fname.endswith('.xls'):
+            return pd.read_excel(file, engine='xlrd')
+        else:
+            return pd.read_excel(file)
+    except Exception as e:
+        st.error(f"Error reading file: {e}")
+        return None
 
-def generate_tally_xml(df, bank_ledger, default_party, master_list):
-    """Generates Tally XML based on verified 'good one' sample logic."""
+def generate_tally_xml(df, bank_led_sel, party_led_sel, master_list):
+    """Strictly matches the structure of 'good one.xml' sample."""
     xml_header = """<ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>Vouchers</REPORTNAME></REQUESTDESC><REQUESTDATA>"""
     xml_footer = """</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>"""
     xml_body = ""
     
-    df.columns = [str(c).strip() for c in df.columns]
+    # Auto-trace Actual Bank if Premium is selected for Bank Ledger
+    actual_bank = bank_led_sel
+    if "⭐" in bank_led_sel and master_list:
+        actual_bank = trace_ledger(str(df.iloc[0]), master_list)
+        if actual_bank == "Suspense": actual_bank = "Bank" # Fallback for bank
     
     for _, row in df.iterrows():
         try:
-            # Clean Amounts
-            debit = float(str(row.get('Debit', 0)).replace(',', '')) if row.get('Debit') else 0
-            credit = float(str(row.get('Credit', 0)).replace(',', '')) if row.get('Credit') else 0
+            # Normalize column access
+            debit = float(str(row.get('Debit', row.get('Withdrawal', 0))).replace(',', '')) if row.get('Debit') or row.get('Withdrawal') else 0
+            credit = float(str(row.get('Credit', row.get('Deposit', 0))).replace(',', '')) if row.get('Credit') or row.get('Deposit') else 0
             narration_raw = str(row.get('Narration', row.get('Description', '')))
             
-            # Restore Payment/Receipt logic from sample
+            # Logic from 'good one.xml'
             if debit > 0:
                 vch_type, amt = "Payment", debit
-                led1, led1_pos, led1_amt = (default_party, "Yes", -amt)
-                led2, led2_pos, led2_amt = (bank_ledger, "No", amt)
+                # Payment: Dr Suspense (Yes), Cr Bank (No)
+                led1, led1_pos, led1_amt = (party_led_sel, "Yes", -amt)
+                led2, led2_pos, led2_amt = (actual_bank, "No", amt)
             elif credit > 0:
                 vch_type, amt = "Receipt", credit
-                led1, led1_pos, led1_amt = (bank_ledger, "Yes", -amt)
-                led2, led2_pos, led2_amt = (default_party, "No", amt)
+                # Receipt: Dr Bank (Yes), Cr Suspense (No)
+                led1, led1_pos, led1_amt = (actual_bank, "Yes", -amt)
+                led2, led2_pos, led2_amt = (party_led_sel, "No", amt)
             else: continue
 
-            # ⭐ AI Trace Integration
-            if "⭐" in default_party and master_list:
+            # AI Tracing: If match fails, trace_ledger returns 'Suspense'
+            if "⭐" in party_led_sel and master_list:
                 traced = trace_ledger(narration_raw, master_list)
                 if vch_type == "Payment": led1 = traced
                 else: led2 = traced
 
-            # Format Date & Escape Narrations
             try: date_str = pd.to_datetime(row.get('Date')).strftime("%Y%m%d")
             except: date_str = "20260101"
             
@@ -114,8 +126,9 @@ def generate_tally_xml(df, bank_ledger, default_party, master_list):
 
 # --- 4. UI DASHBOARD ---
 
-hero_logo = base64.b64encode(open("logo.png", "rb").read()).decode() if io.open("logo.png", "rb") else ""
-st.markdown(f'<div class="hero-container"><img src="data:image/png;base64,{hero_logo}" width="120"><div style="font-size:3.5rem; font-weight:800;">Accounting Expert</div></div>', unsafe_allow_html=True)
+hero_logo = get_img_as_base64("logo.png")
+hero_html = f'<img src="data:image/png;base64,{hero_logo}" width="120">' if hero_logo else ""
+st.markdown(f'<div class="hero-container">{hero_html}<div style="font-size:3.5rem; font-weight:800;">Accounting Expert</div></div>', unsafe_allow_html=True)
 
 col1, col2 = st.columns([1, 1.5], gap="large")
 
@@ -129,19 +142,21 @@ with col1:
         st.success(f"✅ Synced {len(synced_masters)} ledgers")
         ledger_options = ["⭐ AI Auto-Trace (Premium)"] + synced_masters
     
-    bank_led = st.selectbox("Select Bank Ledger", ["State Bank of India -38500202509"])
+    bank_led = st.selectbox("Select Bank Ledger", ledger_options)
     party_led = st.selectbox("Select Default Party", ledger_options)
 
 with col2:
     st.markdown("### 📂 2. Upload & Convert")
-    bank_file = st.file_uploader("Drop Statement here (Excel or PDF)", type=['xlsx', 'pdf'])
+    # THE FIX: Added 'xls' to allowed types
+    bank_file = st.file_uploader("Drop Statement here (Excel or PDF)", type=['xlsx', 'xls', 'pdf'])
     if bank_file:
         if st.button("🚀 Convert to Tally XML"):
             df = load_data(bank_file)
-            xml_data = generate_tally_xml(df, bank_led, party_led, synced_masters)
-            st.balloons()
-            st.success("Conversion Successful!")
-            st.download_button("⬇️ Download Tally XML File", xml_data, "tally_import.xml", use_container_width=True)
+            if df is not None:
+                xml_data = generate_tally_xml(df, bank_led, party_led, synced_masters)
+                st.balloons()
+                st.success("Premium AI Match Complete!")
+                st.download_button("⬇️ Download Tally XML File", xml_data, "tally_import.xml", use_container_width=True)
 
 # --- 5. BRANDED FOOTER ---
 st.markdown(f"""<div class="footer">
