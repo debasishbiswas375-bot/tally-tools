@@ -27,40 +27,11 @@ st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
         html, body, [class*="css"] { font-family: 'Inter', sans-serif; background-color: #F8FAFC; }
-        
-        .hero-container { 
-            text-align: center; padding: 50px 20px; 
-            background: linear-gradient(135deg, #065F46 0%, #1E40AF 100%); 
-            color: white; margin: -6rem -4rem 30px -4rem; 
-        }
-        
-        .bank-detect-box { 
-            background-color: #E0F2FE; border: 1px solid #3B82F6; 
-            padding: 15px; border-radius: 12px; color: #1E3A8A; 
-            font-weight: 700; margin-bottom: 20px; text-align: center; border-left: 8px solid #3B82F6; 
-        }
-        
-        .warning-box { 
-            background-color: #FEF2F2; border: 1px solid #EF4444; 
-            padding: 15px; border-radius: 10px; margin: 15px 0; 
-            color: #991B1B; font-weight: 600; border-left: 8px solid #EF4444; 
-        }
-        
-        .stButton>button { 
-            width: 100%; background: #10B981; color: white; 
-            height: 55px; font-weight: 600; border-radius: 12px; 
-            border: none; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3); 
-        }
-        
-        .footer { 
-            position: fixed; left: 0; bottom: 0; width: 100%; 
-            background-color: white; color: #64748B; text-align: center; 
-            padding: 12px 0; border-top: 1px solid #E2E8F0; z-index: 1000; font-size: 0.9rem; 
-        }
-        
-        /* Loading Text Style */
-        .loading-text { color: #1E40AF; font-weight: 600; font-size: 1.1rem; text-align: center; }
-
+        .hero-container { text-align: center; padding: 50px 20px; background: linear-gradient(135deg, #065F46 0%, #1E40AF 100%); color: white; margin: -6rem -4rem 30px -4rem; }
+        .bank-detect-box { background-color: #E0F2FE; border: 1px solid #3B82F6; padding: 15px; border-radius: 12px; color: #1E3A8A; font-weight: 700; margin-bottom: 20px; text-align: center; border-left: 8px solid #3B82F6; }
+        .warning-box { background-color: #FEF2F2; border: 1px solid #EF4444; padding: 15px; border-radius: 10px; margin: 15px 0; color: #991B1B; font-weight: 600; border-left: 8px solid #EF4444; }
+        .stButton>button { width: 100%; background: #10B981; color: white; height: 55px; font-weight: 600; border-radius: 12px; border: none; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3); }
+        .footer { position: fixed; left: 0; bottom: 0; width: 100%; background-color: white; color: #64748B; text-align: center; padding: 12px 0; border-top: 1px solid #E2E8F0; z-index: 1000; font-size: 0.9rem; }
         .main-content { padding-bottom: 120px; }
         #MainMenu, footer, header { visibility: hidden; }
     </style>
@@ -79,17 +50,41 @@ def trace_identity_power(narration, master_list):
     nar_up = str(narration).upper()
     sorted_masters = sorted(master_list, key=len, reverse=True)
     for ledger in sorted_masters:
-        if re.search(rf"\b{re.escape(ledger.upper())}\b", nar_up):
+        pattern = rf"\b{re.escape(ledger.upper())}\b"
+        if re.search(pattern, nar_up):
             return ledger, "🎯 Direct Match"
     if "UPI" in nar_up: return "Untraced", "⚠️ UPI Alert"
     return "Suspense", "None"
 
 def generate_tally_xml(df, bank_led, synced, upi_fix_led=None):
-    xml_start = '<?xml version="1.0"?><ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>Vouchers</REPORTNAME></REQUESTDESC><REQUESTDATA>'
-    xml_end = '</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>'
+    """FIXED XML: Includes correct Tally Envelope and UTF-8 encoding"""
+    xml_header = '<?xml version="1.0" encoding="UTF-8"?><ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>Vouchers</REPORTNAME></REQUESTDESC><REQUESTDATA>'
+    xml_footer = '</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>'
     xml_body = ""
-    # XML Generation Logic...
-    return xml_start + xml_body + xml_end
+    
+    n_c = next((c for c in df.columns if any(k in str(c) for k in ['NARRATION', 'DESC'])), df.columns[1])
+    dr_c = next((c for c in df.columns if any(k in str(c) for k in ['WITHDRAWAL', 'DEBIT'])), None)
+    cr_c = next((c for c in df.columns if any(k in str(c) for k in ['DEPOSIT', 'CREDIT'])), None)
+    d_c = next((c for c in df.columns if 'DATE' in str(c)), df.columns[0])
+
+    for _, row in df.iterrows():
+        try:
+            # Clean Narration for XML safety
+            nar = str(row[n_c]).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+            # Tally needs YYYYMMDD format
+            dt = pd.to_datetime(row[d_c]).strftime('%Y%m%d')
+            val_dr = float(str(row.get(dr_c, 0)).replace(',', '')) if dr_c and row[dr_c] else 0
+            val_cr = float(str(row.get(cr_c, 0)).replace(',', '')) if cr_c and row[cr_c] else 0
+            
+            target, status = trace_identity_power(nar, synced)
+            if status == "⚠️ UPI Alert" and upi_fix_led: target = upi_fix_led
+            
+            if val_dr > 0: # Payment Entry
+                xml_body += f"""<TALLYMESSAGE xmlns:UDF="TallyUDF"><VOUCHER VCHTYPE="Payment" ACTION="Create"><DATE>{dt}</DATE><NARRATION>{nar}</NARRATION><VOUCHERTYPENAME>Payment</VOUCHERTYPENAME><ALLLEDGERENTRIES.LIST><LEDGERNAME>{target}</LEDGERNAME><ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE><AMOUNT>-{val_dr}</AMOUNT></ALLLEDGERENTRIES.LIST><ALLLEDGERENTRIES.LIST><LEDGERNAME>{bank_led}</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>{val_dr}</AMOUNT></ALLLEDGERENTRIES.LIST></VOUCHER></TALLYMESSAGE>"""
+            elif val_cr > 0: # Receipt Entry
+                xml_body += f"""<TALLYMESSAGE xmlns:UDF="TallyUDF"><VOUCHER VCHTYPE="Receipt" ACTION="Create"><DATE>{dt}</DATE><NARRATION>{nar}</NARRATION><VOUCHERTYPENAME>Receipt</VOUCHERTYPENAME><ALLLEDGERENTRIES.LIST><LEDGERNAME>{bank_led}</LEDGERNAME><ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE><AMOUNT>-{val_cr}</AMOUNT></ALLLEDGERENTRIES.LIST><ALLLEDGERENTRIES.LIST><LEDGERNAME>{target}</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>{val_cr}</AMOUNT></ALLLEDGERENTRIES.LIST></VOUCHER></TALLYMESSAGE>"""
+        except: continue
+    return xml_header + xml_body + xml_footer
 
 def load_data(file):
     try:
@@ -111,19 +106,19 @@ def load_data(file):
 # --- 5. UI IMPLEMENTATION ---
 l_top = get_img_as_base64("logo.png")
 l_top_h = f'<img src="data:image/png;base64,{l_top}" width="80" style="margin-bottom:10px;">' if l_top else ""
-st.markdown(f'<div class="hero-container">{l_top_h}<h1>Accounting Expert</h1><p>BOB 0138 Identity Trace System</p></div>', unsafe_allow_html=True)
+st.markdown(f'<div class="hero-container">{l_top_h}<h1>Accounting Expert</h1><p>BOB 0138 Import-Safe System</p></div>', unsafe_allow_html=True)
 
 st.markdown('<div class="main-content">', unsafe_allow_html=True)
-col1, col2 = st.columns([1, 1.5], gap="large")
+c1, c2 = st.columns([1, 1.5], gap="large")
 
-with col1:
+with c1:
     st.markdown("### 🛠️ 1. Settings")
     master_file = st.file_uploader("Upload Master.html", type=['html'])
     synced = extract_ledger_names(master_file) if master_file else []
     if synced: st.toast(f"✅ {len(synced)} Ledgers Synced!")
     bank_ledger = st.selectbox("Select Bank Account", ["⭐ Auto-Detect"] + synced)
 
-with col2:
+with c2:
     st.markdown("### 📂 2. Convert & Preview")
     bank_file = st.file_uploader("Upload BOB Statement", type=['xlsx', 'xls', 'pdf'])
     
@@ -139,31 +134,22 @@ with col2:
             n_c = next((c for c in df.columns if any(k in str(c) for k in ['NARRATION', 'DESC'])), df.columns[1])
             unmatched = [idx for idx, r in df.iterrows() if trace_identity_power(r[n_c], synced)[1] == "⚠️ UPI Alert"]
             
-            st.write("**Smart Identity Preview:**")
+            st.write("**Identity Preview:**")
             st.table([{"Narration": str(row[n_c])[:50], "Target": trace_identity_power(row[n_c], synced)[0]} for _, row in df.head(5).iterrows()])
 
-            # --- CONVERT BUTTON WITH COOL LOADING ---
             if len(unmatched) > 5:
-                st.markdown(f'<div class="warning-box">⚠️ Found {len(unmatched)} Untraced Items!</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="warning-box">⚠️ Action Required: {len(unmatched)} items are Untraced.</div>', unsafe_allow_html=True)
                 upi_fix = st.selectbox("Assign Untraced to:", synced)
                 if st.button("🚀 Process & Generate Tally XML"):
-                    with st.status("🛠️ AI is identifying transactions...", expanded=True) as status:
-                        st.write("Reading Tally Masters...")
-                        time.sleep(1)
-                        st.write("Tracing Identities (Mithu Sk vs Mondal)...")
-                        time.sleep(1)
-                        st.write("Generating Tally XML Engine...")
+                    with st.status("🛠️ Optimizing XML for Tally Prime...", expanded=True) as status:
                         xml = generate_tally_xml(df, active_bank, synced, upi_fix)
-                        status.update(label="✅ Conversion Complete!", state="complete", expanded=False)
-                    st.balloons()
+                        status.update(label="✅ Ready for Import!", state="complete", expanded=False)
                     st.download_button("⬇️ Download tally_import.xml", xml, "tally_import.xml")
             else:
                 if st.button("🚀 Convert to Tally XML"):
-                    with st.status("🚀 Processing Data...", expanded=True) as status:
+                    with st.status("🚀 Converting...", expanded=True) as status:
                         xml = generate_tally_xml(df, active_bank, synced)
-                        time.sleep(1)
-                        status.update(label="✅ Ready!", state="complete", expanded=False)
-                    st.balloons()
+                        status.update(label="✅ Success!", state="complete", expanded=False)
                     st.download_button("⬇️ Download tally_import.xml", xml, "tally_import.xml")
 
 st.markdown('</div>', unsafe_allow_html=True)
