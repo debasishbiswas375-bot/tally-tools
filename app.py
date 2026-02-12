@@ -29,24 +29,15 @@ def extract_ledger_names(html_file):
     except: return []
 
 def trace_ledger_prioritized(remark, master_list, upi_sale_led, upi_pur_led, vch_type):
-    """Priority 1: Direct Match | Priority 2: UPI Categorization | Priority 3: Suspense."""
     if not remark or pd.isna(remark): return "Suspense"
-    
     remark_up = str(remark).upper()
-
-    # --- PRIORITY 1: DIRECT NAME MATCH ---
     for ledger in master_list:
-        if ledger.upper() in remark_up:
-            return ledger
-
-    # --- PRIORITY 2: UPI METHOD MATCH ---
+        if ledger.upper() in remark_up: return ledger
     if "UPI" in remark_up:
         return upi_pur_led if vch_type == "Payment" else upi_sale_led
-    
     return "Suspense"
 
 def load_data(file):
-    """Handles metadata skipping and duplicate column names."""
     try:
         if file.name.lower().endswith('.pdf'):
             all_rows = []
@@ -57,17 +48,14 @@ def load_data(file):
             df = pd.DataFrame(all_rows)
         else:
             df = pd.read_excel(file, header=None)
-
         header_idx = 0
         for i, row in df.iterrows():
             row_str = " ".join([str(x).lower() for x in row if x])
             if 'date' in row_str and ('narration' in row_str or 'description' in row_str):
                 header_idx = i
                 break
-        
         df.columns = [str(c).strip().upper() if not pd.isna(c) else f"COL_{j}" for j, c in enumerate(df.iloc[header_idx])]
         df = df[header_idx + 1:].reset_index(drop=True)
-        
         cols = pd.Series(df.columns)
         for dup in cols[cols.duplicated()].unique():
             cols[cols[cols == dup].index.values.tolist()] = [f"{dup}_{k}" if k != 0 else dup for k in range(sum(cols == dup))]
@@ -78,7 +66,7 @@ def load_data(file):
         return None
 
 def generate_tally_xml(df, bank_led, party_led, master_list, upi_sale, upi_pur):
-    """Generates XML based on verified structure and signs."""
+    """FIXED: Strictly adheres to 'good one.xml' tag structure and signs."""
     xml_header = """<ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>Vouchers</REPORTNAME></REQUESTDESC><REQUESTDATA>"""
     xml_footer = """</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>"""
     xml_body = ""
@@ -94,29 +82,34 @@ def generate_tally_xml(df, bank_led, party_led, master_list, upi_sale, upi_pur):
             val_dr = float(str(row.get(dr_col, 0)).replace(',', '')) if dr_col and row.get(dr_col) else 0
             val_cr = float(str(row.get(cr_col, 0)).replace(',', '')) if cr_col and row.get(cr_col) else 0
             nar = str(row.get(n_col, ''))
-            
+            if val_dr <= 0 and val_cr <= 0: continue
+
+            # VOUCHER SIGNAGE LOGIC
             if val_dr > 0:
                 vch, amt = "Payment", val_dr
-                l1, l1p, l1a = (party_led, "Yes", -amt), (bank_led, "No", amt)
-            elif val_cr > 0:
+                l1_name, l1_pos, l1_amt = (party_led, "Yes", -amt)
+                l2_name, l2_pos, l2_amt = (bank_led, "No", amt)
+            else:
                 vch, amt = "Receipt", val_cr
-                l1, l1p, l1a = (bank_led, "Yes", -amt), (party_led, "No", amt)
-            else: continue
+                l1_name, l1_pos, l1_amt = (bank_led, "Yes", -amt)
+                l2_name, l2_pos, l2_amt = (party_led, "No", amt)
 
-            # Apply Prioritized Tracing
+            # PRIORITY TRACING
             if "⭐" in party_led:
                 traced = trace_ledger_prioritized(nar, master_list, upi_sale, upi_pur, vch)
-                if vch == "Payment": l1 = (traced, "Yes", -amt)
-                else: l1 = (l1[0], "Yes", -amt); l2 = (traced, "No", amt)
-            else: l2 = (l1[1], l1[2], l1[3]) if 'l2' not in locals() else l2 # Helper for flow
+                if vch == "Payment": l1_name = traced
+                else: l2_name = traced
 
-            p_led, p_pos, p_amt = l1[0] if isinstance(l1, tuple) else l1, l1[1], l1[2]
-            b_led, b_pos, b_amt = l2[0] if isinstance(l2, tuple) else l2, l2[1], l2[2]
-
+            clean_nar = nar.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
             try: dt = pd.to_datetime(row.get(d_col)).strftime("%Y%m%d")
             except: dt = "20260101"
 
-            xml_body += f"""<TALLYMESSAGE xmlns:UDF="TallyUDF"><VOUCHER VCHTYPE="{vch}" ACTION="Create" OBJVIEW="Accounting Voucher View"><DATE>{dt}</DATE><NARRATION>{nar.replace('&', '&amp;')}</NARRATION><VOUCHERTYPENAME>{vch}</VOUCHERTYPENAME><ALLLEDGERENTRIES.LIST><LEDGERNAME>{p_led}</LEDGERNAME><ISDEEMEDPOSITIVE>{p_pos}</ISDEEMEDPOSITIVE><AMOUNT>{p_amt}</AMOUNT></ALLLEDGERENTRIES.LIST><ALLLEDGERENTRIES.LIST><LEDGERNAME>{b_led}</LEDGERNAME><ISDEEMEDPOSITIVE>{b_pos}</ISDEEMEDPOSITIVE><AMOUNT>{b_amt}</AMOUNT></ALLLEDGERENTRIES.LIST></VOUCHER></TALLYMESSAGE>"""
+            xml_body += f"""<TALLYMESSAGE xmlns:UDF="TallyUDF">
+                <VOUCHER VCHTYPE="{vch}" ACTION="Create" OBJVIEW="Accounting Voucher View">
+                    <DATE>{dt}</DATE><NARRATION>{clean_nar}</NARRATION><VOUCHERTYPENAME>{vch}</VOUCHERTYPENAME>
+                    <ALLLEDGERENTRIES.LIST><LEDGERNAME>{l1_name}</LEDGERNAME><ISDEEMEDPOSITIVE>{l1_pos}</ISDEEMEDPOSITIVE><AMOUNT>{l1_amt}</AMOUNT></ALLLEDGERENTRIES.LIST>
+                    <ALLLEDGERENTRIES.LIST><LEDGERNAME>{l2_name}</LEDGERNAME><ISDEEMEDPOSITIVE>{l2_pos}</ISDEEMEDPOSITIVE><AMOUNT>{l2_amt}</AMOUNT></ALLLEDGERENTRIES.LIST>
+                </VOUCHER></TALLYMESSAGE>"""
         except: continue
     return xml_header + xml_body + xml_footer
 
@@ -132,15 +125,11 @@ with c1:
         synced = extract_ledger_names(master)
         st.success(f"✅ Synced {len(synced)} ledgers")
         options = ["⭐ AI Auto-Trace (Premium)"] + synced
-    
     bank_led = st.selectbox("Select Bank Ledger", options)
     party_led = st.selectbox("Default Party", options)
-    
-    # --- NEW: UPI PRIORITY SELECTION ---
     st.markdown("---")
-    st.write("🎯 **UPI Transaction Settings**")
-    upi_sale = st.selectbox("Ledger for UPI Receipts", options, index=0)
-    upi_pur = st.selectbox("Ledger for UPI Payments", options, index=0)
+    upi_sale = st.selectbox("UPI Receipts Ledger", options)
+    upi_pur = st.selectbox("UPI Payments Ledger", options)
 
 with c2:
     st.markdown("### 📂 2. Convert")
@@ -150,15 +139,8 @@ with c2:
         if df is not None:
             st.dataframe(df.head(3), use_container_width=True)
             if st.button("🚀 Convert to Tally XML"):
-                # Preview matches
-                st.markdown("📋 **Live Accounting Match Preview**")
-                n_c = next((c for c in df.columns if 'narration' in str(c).lower()), df.columns[1])
-                preview = [{"Narration": str(row[n_c])[:60], "Matched Ledger": trace_ledger_prioritized(row[n_c], synced, upi_sale, upi_pur, "Payment")} for _, row in df.head(5).iterrows()]
-                st.table(preview)
-
                 xml_data = generate_tally_xml(df, bank_led, party_led, synced, upi_sale, upi_pur)
-                st.success("Premium AI Match Complete!")
+                st.success("XML Generated!")
                 st.download_button("⬇️ Download XML", xml_data, "tally_import.xml", use_container_width=True)
 
-# --- 5. FOOTER ---
 st.markdown("""<div class="footer"><p>Sponsored By <b>Uday Mondal</b> | Advocate</p><p style="font-size:12px;">Created by Debasish Biswas</p></div>""", unsafe_allow_html=True)
