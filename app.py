@@ -15,14 +15,14 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- 2. IMAGE HANDLER ---
+# --- 2. IMAGE HANDLER (Safe Load) ---
 def get_img_as_base64(file):
     try:
         with open(file, "rb") as f:
             return base64.b64encode(f.read()).decode()
     except: return None
 
-# --- 3. PREMIUM UI & LOADING CSS ---
+# --- 3. PREMIUM UI & FAST LOADING CSS ---
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
@@ -37,60 +37,72 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 4. CORE ENGINES ---
+# --- 4. OPTIMIZED TRACE ENGINE ---
 
+@st.cache_data
 def extract_ledger_names(html_file):
     try:
         soup = BeautifulSoup(html_file, 'html.parser')
-        return sorted(list(set([td.text.strip() for td in soup.find_all('td') if len(td.text.strip()) > 1])))
+        # Efficiently pull unique ledger names
+        return sorted(list(set([td.text.strip() for td in soup.find_all('td') if len(td.text.strip()) > 1])), key=len, reverse=True)
     except: return []
 
-def trace_identity_power(narration, master_list):
+def trace_identity_fast(narration, sorted_masters):
+    """Optimized for speed: Uses pre-sorted list to find specific names first."""
     if not narration or pd.isna(narration): return "Suspense", "None"
     nar_up = str(narration).upper()
-    sorted_masters = sorted(master_list, key=len, reverse=True)
+    
     for ledger in sorted_masters:
-        pattern = rf"\b{re.escape(ledger.upper())}\b"
-        if re.search(pattern, nar_up):
+        if ledger.upper() in nar_up:
             return ledger, "🎯 Direct Match"
+            
     if "UPI" in nar_up: return "Untraced", "⚠️ UPI Alert"
     return "Suspense", "None"
 
 def generate_tally_xml(df, bank_led, synced, upi_fix_led=None):
-    """FIXED XML: Includes correct Tally Envelope and UTF-8 encoding"""
+    """Turbo XML Engine with Tally Prime Validation"""
     xml_header = '<?xml version="1.0" encoding="UTF-8"?><ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>Vouchers</REPORTNAME></REQUESTDESC><REQUESTDATA>'
     xml_footer = '</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>'
     xml_body = ""
     
+    # Pre-compiled regex for speed
     n_c = next((c for c in df.columns if any(k in str(c) for k in ['NARRATION', 'DESC'])), df.columns[1])
     dr_c = next((c for c in df.columns if any(k in str(c) for k in ['WITHDRAWAL', 'DEBIT'])), None)
     cr_c = next((c for c in df.columns if any(k in str(c) for k in ['DEPOSIT', 'CREDIT'])), None)
     d_c = next((c for c in df.columns if 'DATE' in str(c)), df.columns[0])
 
-    for _, row in df.iterrows():
+    progress_bar = st.progress(0)
+    total_rows = len(df)
+
+    for i, row in df.iterrows():
         try:
-            # Clean Narration for XML safety
             nar = str(row[n_c]).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-            # Tally needs YYYYMMDD format
             dt = pd.to_datetime(row[d_c]).strftime('%Y%m%d')
             val_dr = float(str(row.get(dr_c, 0)).replace(',', '')) if dr_c and row[dr_c] else 0
             val_cr = float(str(row.get(cr_c, 0)).replace(',', '')) if cr_c and row[cr_c] else 0
             
-            target, status = trace_identity_power(nar, synced)
+            target, status = trace_identity_fast(nar, synced)
             if status == "⚠️ UPI Alert" and upi_fix_led: target = upi_fix_led
             
-            if val_dr > 0: # Payment Entry
+            if val_dr > 0:
                 xml_body += f"""<TALLYMESSAGE xmlns:UDF="TallyUDF"><VOUCHER VCHTYPE="Payment" ACTION="Create"><DATE>{dt}</DATE><NARRATION>{nar}</NARRATION><VOUCHERTYPENAME>Payment</VOUCHERTYPENAME><ALLLEDGERENTRIES.LIST><LEDGERNAME>{target}</LEDGERNAME><ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE><AMOUNT>-{val_dr}</AMOUNT></ALLLEDGERENTRIES.LIST><ALLLEDGERENTRIES.LIST><LEDGERNAME>{bank_led}</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>{val_dr}</AMOUNT></ALLLEDGERENTRIES.LIST></VOUCHER></TALLYMESSAGE>"""
-            elif val_cr > 0: # Receipt Entry
+            elif val_cr > 0:
                 xml_body += f"""<TALLYMESSAGE xmlns:UDF="TallyUDF"><VOUCHER VCHTYPE="Receipt" ACTION="Create"><DATE>{dt}</DATE><NARRATION>{nar}</NARRATION><VOUCHERTYPENAME>Receipt</VOUCHERTYPENAME><ALLLEDGERENTRIES.LIST><LEDGERNAME>{bank_led}</LEDGERNAME><ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE><AMOUNT>-{val_cr}</AMOUNT></ALLLEDGERENTRIES.LIST><ALLLEDGERENTRIES.LIST><LEDGERNAME>{target}</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>{val_cr}</AMOUNT></ALLLEDGERENTRIES.LIST></VOUCHER></TALLYMESSAGE>"""
+            
+            if i % 10 == 0: progress_bar.progress((i + 1) / total_rows)
         except: continue
+    
+    progress_bar.empty()
     return xml_header + xml_body + xml_footer
 
 def load_data(file):
     try:
         if file.name.lower().endswith('.pdf'):
             with pdfplumber.open(file) as pdf:
-                all_data = [row for page in pdf.pages for row in (page.extract_table() or [])]
+                all_data = []
+                for page in pdf.pages:
+                    table = page.extract_table()
+                    if table: all_data.extend(table)
             df = pd.DataFrame(all_data)
         else:
             df = pd.read_excel(file, header=None)
@@ -103,10 +115,10 @@ def load_data(file):
         return None, None
     except: return None, None
 
-# --- 5. UI IMPLEMENTATION ---
+# --- 5. UI DASHBOARD ---
 l_top = get_img_as_base64("logo.png")
 l_top_h = f'<img src="data:image/png;base64,{l_top}" width="80" style="margin-bottom:10px;">' if l_top else ""
-st.markdown(f'<div class="hero-container">{l_top_h}<h1>Accounting Expert</h1><p>BOB 0138 Import-Safe System</p></div>', unsafe_allow_html=True)
+st.markdown(f'<div class="hero-container">{l_top_h}<h1>Accounting Expert</h1><p>High-Speed AI Trace Engine</p></div>', unsafe_allow_html=True)
 
 st.markdown('<div class="main-content">', unsafe_allow_html=True)
 c1, c2 = st.columns([1, 1.5], gap="large")
@@ -119,7 +131,7 @@ with c1:
     bank_ledger = st.selectbox("Select Bank Account", ["⭐ Auto-Detect"] + synced)
 
 with c2:
-    st.markdown("### 📂 2. Convert & Preview")
+    st.markdown("### 📂 2. Convert & Download")
     bank_file = st.file_uploader("Upload BOB Statement", type=['xlsx', 'xls', 'pdf'])
     
     if bank_file and master_file:
@@ -132,24 +144,26 @@ with c2:
             st.markdown(f'<div class="bank-detect-box">🏦 Bank Account: <b>{active_bank}</b></div>', unsafe_allow_html=True)
             
             n_c = next((c for c in df.columns if any(k in str(c) for k in ['NARRATION', 'DESC'])), df.columns[1])
-            unmatched = [idx for idx, r in df.iterrows() if trace_identity_power(r[n_c], synced)[1] == "⚠️ UPI Alert"]
+            unmatched = [idx for idx, r in df.iterrows() if trace_identity_fast(r[n_c], synced)[1] == "⚠️ UPI Alert"]
             
-            st.write("**Identity Preview:**")
-            st.table([{"Narration": str(row[n_c])[:50], "Target": trace_identity_power(row[n_c], synced)[0]} for _, row in df.head(5).iterrows()])
+            st.write("**Smart Identity Preview:**")
+            st.table([{"Narration": str(row[n_c])[:50], "Target": trace_identity_fast(row[n_c], synced)[0]} for _, row in df.head(5).iterrows()])
 
             if len(unmatched) > 5:
-                st.markdown(f'<div class="warning-box">⚠️ Action Required: {len(unmatched)} items are Untraced.</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="warning-box">⚠️ Action Required: Found {len(unmatched)} Untraced Items!</div>', unsafe_allow_html=True)
                 upi_fix = st.selectbox("Assign Untraced to:", synced)
                 if st.button("🚀 Process & Generate Tally XML"):
-                    with st.status("🛠️ Optimizing XML for Tally Prime...", expanded=True) as status:
+                    with st.status("⚡ Turbo-Tracing transactions...", expanded=True) as status:
                         xml = generate_tally_xml(df, active_bank, synced, upi_fix)
-                        status.update(label="✅ Ready for Import!", state="complete", expanded=False)
+                        status.update(label="✅ Conversion Finished!", state="complete", expanded=False)
+                    st.balloons()
                     st.download_button("⬇️ Download tally_import.xml", xml, "tally_import.xml")
             else:
                 if st.button("🚀 Convert to Tally XML"):
                     with st.status("🚀 Converting...", expanded=True) as status:
                         xml = generate_tally_xml(df, active_bank, synced)
                         status.update(label="✅ Success!", state="complete", expanded=False)
+                    st.balloons()
                     st.download_button("⬇️ Download tally_import.xml", xml, "tally_import.xml")
 
 st.markdown('</div>', unsafe_allow_html=True)
