@@ -20,6 +20,7 @@ st.markdown("""
         html, body, [class*="css"] { font-family: 'Inter', sans-serif; background-color: #F8FAFC; }
         .hero-container { text-align: center; padding: 50px; background: linear-gradient(135deg, #065F46 0%, #1E40AF 100%); color: white; margin: -6rem -4rem 30px -4rem; }
         .stButton>button { width: 100%; background: #10B981; color: white; height: 55px; font-weight: 600; border-radius: 8px; border: none; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3); }
+        .bank-detect-box { background-color: #E0F2FE; border: 2px solid #3B82F6; padding: 15px; border-radius: 10px; color: #1E3A8A; font-weight: 600; margin-bottom: 20px; text-align: center; }
         .warning-box { background-color: #FFFBEB; border: 2px solid #F59E0B; padding: 20px; border-radius: 12px; margin: 20px 0; color: #92400E; }
         .footer { margin-top: 60px; padding: 40px; text-align: center; color: #64748B; border-top: 1px solid #E2E8F0; background-color: white; margin-left: -4rem; margin-right: -4rem; }
         #MainMenu, footer, header { visibility: hidden; }
@@ -57,7 +58,6 @@ def load_data(file):
                     if table: all_rows.extend(table)
             df = pd.DataFrame(all_rows)
         else:
-            # Load BOB statement
             df = pd.read_excel(file, header=None)
         
         header_idx = 0
@@ -69,18 +69,13 @@ def load_data(file):
         
         df.columns = [str(c).strip().upper() if not pd.isna(c) else f"COL_{j}" for j, c in enumerate(df.iloc[header_idx])]
         df = df[header_idx + 1:].reset_index(drop=True)
-        
-        cols = pd.Series(df.columns)
-        for dup in cols[cols.duplicated()].unique():
-            cols[cols[cols == dup].index.values.tolist()] = [f"{dup}_{k}" if k != 0 else dup for k in range(sum(cols == dup))]
-        df.columns = cols
         return df.dropna(subset=[df.columns[1]], thresh=1)
     except: return None
 
 # --- 4. UI DASHBOARD ---
 h_logo = get_img_as_base64("logo.png")
 h_html = f'<img src="data:image/png;base64,{h_logo}" width="100">' if h_logo else ""
-st.markdown(f'<div class="hero-container">{h_html}<h1>Accounting Expert</h1><p>Auto-Select Bank Ledger Logic</p></div>', unsafe_allow_html=True)
+st.markdown(f'<div class="hero-container">{h_html}<h1>Accounting Expert</h1><p>Premium BOB Auto-Select Enabled</p></div>', unsafe_allow_html=True)
 
 c1, c2 = st.columns([1, 1.5], gap="large")
 
@@ -93,8 +88,8 @@ with c1:
         st.success(f"✅ Synced {len(synced)} ledgers")
         options = ["⭐ AI Auto-Trace (Bank)"] + synced
     
-    bank_led_choice = st.selectbox("Select Bank Ledger", options)
-    party_led_choice = st.selectbox("Select Party Ledger", ["⭐ AI Auto-Trace (Party)"] + (synced if synced else []))
+    bank_choice = st.selectbox("Select Bank Ledger", options)
+    party_choice = st.selectbox("Select Party Ledger", ["⭐ AI Auto-Trace (Party)"] + synced)
 
 with c2:
     st.markdown("### 📂 2. Convert")
@@ -103,46 +98,34 @@ with c2:
     if bank_file and master:
         df = load_data(bank_file)
         if df is not None:
-            # --- AI BANK TRACE LOGIC ---
-            active_bank = bank_led_choice
-            if bank_led_choice == "⭐ AI Auto-Trace (Bank)":
-                # Combine headers and first rows to detect BOB 138
-                sample_text = " ".join(df.head(10).astype(str).values.flatten()).upper()
-                
-                # Check for BOB specific patterns
-                if any(k in sample_text for k in ["BOB", "BARODA", "138"]):
-                    detected_bank = next((l for l in synced if any(k in l.upper() for k in ["BOB", "BARODA", "138"])), None)
-                    if detected_bank:
-                        active_bank = detected_bank
-                        st.info(f"🏦 **AI Auto-Detected Bank:** {active_bank}")
+            # --- THE AUTO-SELECTED BANK DISPLAY ---
+            active_bank = bank_choice
+            if bank_choice == "⭐ AI Auto-Trace (Bank)":
+                # Scan for BOB 138 keywords
+                metadata_text = " ".join(df.head(15).astype(str).values.flatten()).upper()
+                if any(k in metadata_text for k in ["BOB", "BARODA", "138"]):
+                    detected = next((l for l in synced if any(k in l.upper() for k in ["BOB", "BARODA", "138"])), None)
+                    if detected:
+                        active_bank = detected
+                        st.markdown(f'<div class="bank-detect-box">🏦 Auto-Selected Bank: {active_bank}</div>', unsafe_allow_html=True)
                     else:
-                        st.warning("⚠️ BOB 138 detected in file, but not found in your Master.html.")
-                        active_bank = st.selectbox("Please manually select the BOB Ledger:", synced)
+                        st.warning("⚠️ File is BOB 138, but matching ledger not found in Master.html.")
+                        active_bank = st.selectbox("Select BOB Ledger manually:", synced)
+
+            # --- UPI THRESHOLD VALIDATION ---
+            n_c = next((c for c in df.columns if 'NARRATION' in str(c)), df.columns[1])
+            unmatched_upi = [idx for idx, row in df.iterrows() if trace_ledger_priority(row[n_c], synced)[1] == "UPI_Alert"]
             
-            # --- UNTRACED UPI VALIDATION ---
-            n_c = next((c for c in df.columns if 'NARRATION' in str(c) or 'DESCRIPTION' in str(c)), df.columns[1])
-            unmatched_upi_indices = []
-            for idx, row in df.iterrows():
-                _, status = trace_ledger_priority(row[n_c], synced)
-                if status == "UPI_Alert": unmatched_upi_indices.append(idx)
-            
-            if len(unmatched_upi_indices) > 5:
-                st.markdown(f"""<div class="warning-box">
-                    <h4>⚠️ Too many UPI transactions ({len(unmatched_upi_indices)}) not in master.</h4>
-                    <p>Please select a ledger for these transactions:</p>
-                </div>""", unsafe_allow_html=True)
+            if len(unmatched_upi) > 5:
+                st.markdown(f'<div class="warning-box">⚠️ Too many untraced UPI transactions ({len(unmatched_upi)}) found.</div>', unsafe_allow_html=True)
                 chosen_led = st.selectbox("Assign untraced UPIs to:", synced)
-                
-                if st.button("🚀 Process & Generate XML"):
-                    st.success(f"Processing XML with Bank: {active_bank}")
-                    st.download_button("⬇️ Download tally_import.xml", "XML_CONTENT", file_name="tally_import.xml")
+                if st.button("🚀 Process & Create Tally XML"):
+                    st.success(f"Generated with Bank: {active_bank}")
+                    st.download_button("⬇️ Download tally_import.xml", "XML_DATA", file_name="tally_import.xml")
             else:
-                st.dataframe(df.head(5), use_container_width=True)
                 if st.button("🚀 Convert to Tally XML"):
-                    st.success(f"Matched to Bank: {active_bank}")
-                    st.download_button("⬇️ Download tally_import.xml", "XML_CONTENT", file_name="tally_import.xml")
+                    st.success(f"Conversion complete using: {active_bank}")
+                    st.download_button("⬇️ Download tally_import.xml", "XML_DATA", file_name="tally_import.xml")
 
 # --- 5. FOOTER ---
-s_logo = get_img_as_base64("logo 1.png")
-s_html = f'<img src="data:image/png;base64,{s_logo}" width="25" style="vertical-align:middle;">' if s_logo else ""
-st.markdown(f"""<div class="footer"><p>Sponsored By {s_html} <b>Uday Mondal</b> | Created by <b>Debasish Biswas</b></p></div>""", unsafe_allow_html=True)
+st.markdown(f"""<div class="footer"><p>Sponsored By <b>Uday Mondal</b> | Advocate</p><p style="font-size:12px;">Created by <b>Debasish Biswas</b></p></div>""", unsafe_allow_html=True)
