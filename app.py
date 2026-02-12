@@ -14,50 +14,56 @@ st.set_page_config(
     initial_sidebar_state="expanded" 
 )
 
-# --- 2. UNIFIED BACKGROUND CSS ---
+# --- 2. SOLID UNIFIED THEME CSS ---
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
         
-        /* Apply the deep navy color to every background element */
+        /* Set everything to the same solid background color */
         .stApp, [data-testid="stSidebar"], .main, .stSidebarContent, html, body {
             background-color: #0F172A !important;
             font-family: 'Inter', sans-serif;
             color: #F8FAFC !important;
         }
 
-        /* Ensure sidebar text and icons remain white */
-        [data-testid="stSidebar"] * { color: white !important; }
-        .sidebar-logo-text { font-size: 1.4rem; font-weight: 800; color: white; text-align: center; margin-bottom: 20px; }
-        .sidebar-footer-text { font-size: 12px; color: #94A3B8; text-align: center; margin-top: 30px; }
-
-        /* Hero Header (Gradient Overlay) */
+        /* Hero Section - Solid with a subtle border instead of gradient */
         .hero-container {
-            text-align: center; padding: 40px 20px;
-            background: linear-gradient(135deg, #065F46 0%, #1E40AF 100%);
-            color: white; margin: -6rem -4rem 30px -4rem;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            text-align: center; 
+            padding: 40px 20px;
+            background-color: #1E293B; 
+            color: white; 
+            margin: -6rem -4rem 30px -4rem;
+            border-bottom: 2px solid #10B981;
         }
         
-        /* Input Cards (Glass-Dark Effect) */
+        /* Solid Input Areas */
         .stContainer, div[data-testid="stVerticalBlock"] > div:has(div.stMarkdown) {
-            background: rgba(30, 41, 59, 0.7) !important;
-            backdrop-filter: blur(10px);
-            padding: 25px; border-radius: 16px; 
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            background-color: #1E293B !important;
+            padding: 25px; 
+            border-radius: 12px; 
+            border: 1px solid #334155;
             margin-bottom: 20px;
         }
+
+        /* Sidebar Logo and Text */
+        .sidebar-logo-text { font-size: 1.4rem; font-weight: 800; color: white; text-align: center; margin-bottom: 20px; }
+        .sidebar-footer-text { font-size: 12px; color: #94A3B8; text-align: center; margin-top: 30px; }
 
         h1, h2, h3, p, span, label { color: white !important; }
         h3 { border-left: 5px solid #10B981; padding-left: 12px; font-weight: 700 !important; }
 
         /* Buttons */
         .stButton>button { 
-            width: 100%; background: linear-gradient(90deg, #10B981, #3B82F6); 
-            color: white !important; border-radius: 8px; height: 50px; font-weight: 700; border: none;
+            width: 100%; 
+            background: #10B981; 
+            color: white !important; 
+            border-radius: 8px; 
+            height: 50px; 
+            font-weight: 700; 
+            border: none;
         }
+        .stButton>button:hover { background: #059669; }
         
-        /* Hide default Streamlit overlays */
         #MainMenu, footer, header {visibility: hidden;}
     </style>
 """, unsafe_allow_html=True)
@@ -182,8 +188,6 @@ with col_right:
                     
                     if st.button("🚀 GENERATE XML"):
                         st.balloons()
-                        # XML logic resides here
                 else:
                     status.update(label="❌ Detection Failed", state="error")
                     st.error("I couldn't find the Date/Narration headers. Please check the PDF format.")
-                    
