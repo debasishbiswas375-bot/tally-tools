@@ -20,7 +20,7 @@ st.markdown("""
         html, body, [class*="css"] { font-family: 'Inter', sans-serif; background-color: #F8FAFC; }
         
         .hero-container { text-align: center; padding: 40px; background: linear-gradient(135deg, #065F46 0%, #1E40AF 100%); color: white; margin: -6rem -4rem 20px -4rem; }
-        .bank-detect-box { background-color: #E0F2FE; border: 1px solid #3B82F6; padding: 10px; border-radius: 8px; color: #1E3A8A; font-weight: 700; margin-bottom: 15px; text-align: center; }
+        .bank-detect-box { background-color: #E0F2FE; border: 1px solid #3B82F6; padding: 12px; border-radius: 8px; color: #1E3A8A; font-weight: 700; margin-top: 10px; margin-bottom: 20px; text-align: center; border-left: 5px solid #3B82F6; }
         .warning-box { background-color: #FEF2F2; border: 1px solid #EF4444; padding: 15px; border-radius: 8px; margin: 15px 0; color: #991B1B; font-size: 0.9rem; }
         
         .stButton>button { width: 100%; background: #10B981; color: white; height: 50px; font-weight: 600; border-radius: 8px; border: none; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2); }
@@ -41,8 +41,8 @@ st.markdown("""
         }
         .footer b { color: #0F172A; }
         
-        /* Ensure content doesn't hide behind footer */
-        .main-content { padding-bottom: 100px; }
+        /* Layout Padding */
+        .main-content { padding-bottom: 110px; }
         #MainMenu, footer, header { visibility: hidden; }
     </style>
 """, unsafe_allow_html=True)
@@ -57,18 +57,14 @@ def get_img_as_base64(file):
 def extract_ledger_names(html_file):
     try:
         soup = BeautifulSoup(html_file, 'html.parser')
+        # Extracts unique ledger names from Tally Master HTML
         return sorted(list(set([td.text.strip() for td in soup.find_all('td') if len(td.text.strip()) > 1])))
     except: return []
 
 def trace_identity_power(narration, master_list):
-    """
-    Identity Logic: Matches longest phrases first. 
-    Prevents 'Mithu Sk' from matching 'Mithu Mondal'.
-    Protects 'Medplus Sahanagar' from matching a general 'Saha'.
-    """
+    """Deep Trace: Matches longest names first (Mithu Mondal > Mithu Sk > Mithu)"""
     if not narration or pd.isna(narration): return "Suspense", "None"
     nar_up = str(narration).upper().replace('/', ' ')
-    # Sort masters by length (Longest first)
     sorted_masters = sorted(master_list, key=len, reverse=True)
     for ledger in sorted_masters:
         pattern = rf"\b{re.escape(ledger.upper())}\b"
@@ -78,12 +74,11 @@ def trace_identity_power(narration, master_list):
     return "Suspense", "None"
 
 def generate_tally_xml(df, bank_led, synced, upi_fix_led=None):
-    """PRECISION XML ENGINE: Debit = Yes/-Amount | Credit = No/Amount"""
+    """STRICT TALLY PRIME FORMAT: Debit = Yes/-Amount | Credit = No/Amount"""
     xml_header = """<?xml version="1.0"?><ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>Vouchers</REPORTNAME></REQUESTDESC><REQUESTDATA>"""
     xml_footer = """</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>"""
     xml_body = ""
     
-    # Identify Columns
     n_c = next((c for c in df.columns if 'NARRATION' in str(c)), df.columns[1])
     dr_c = next((c for c in df.columns if 'WITHDRAWAL' in str(c) or 'DEBIT' in str(c)), None)
     cr_c = next((c for c in df.columns if 'DEPOSIT' in str(c) or 'CREDIT' in str(c)), None)
@@ -141,35 +136,37 @@ with c1:
     synced, options = [], ["Upload Master first"]
     if master:
         synced = extract_ledger_names(master)
-        st.success(f"✅ {len(synced)} Ledgers Synced")
+        st.toast(f"✅ {len(synced)} Ledgers Synced Successfully!") # POPUP ✅
         options = ["⭐ Auto-Select Bank"] + synced
     bank_choice = st.selectbox("Select Bank Ledger", options)
 
 with c2:
     st.markdown("### 📂 2. Convert & Preview")
-    bank_file = st.file_uploader("Upload Bank Statement (Excel)", type=['xlsx', 'xls'])
+    bank_file = st.file_uploader("Upload BOB Statement (Excel)", type=['xlsx', 'xls'])
+    
     if bank_file and master:
         df = load_data(bank_file)
         if df is not None:
-            # BANK AUTO-DETECTION
+            # 1. AUTO-BANK DETECTION BOX (Show Below Upload File)
             active_bank = bank_choice
             meta = str(df.iloc[:10].values).upper()
             if "BOB" in meta or "138" in meta:
                 active_bank = next((l for l in synced if any(k in l.upper() for k in ["BOB", "BARODA", "138"])), bank_choice)
-                st.markdown(f'<div class="bank-detect-box">🏦 Auto-Detected: {active_bank}</div>', unsafe_allow_html=True)
+            
+            st.markdown(f'<div class="bank-detect-box">🏦 Selected Bank Account: <b>{active_bank}</b></div>', unsafe_allow_html=True)
 
-            # DATA PREVIEW
+            # 2. DATA PREVIEW TABLE
             st.markdown("### 📋 Smart Mapping Preview")
             n_c = next((c for c in df.columns if 'NARRATION' in str(c)), df.columns[1])
-            preview_rows = [{"Narration": str(row[n_c])[:50], "Target Ledger": trace_identity_power(row[n_c], synced)[0]} for _, row in df.head(10).iterrows()]
+            preview_rows = [{"Narration": str(row[n_c])[:50], "Tally Target": trace_identity_power(row[n_c], synced)[0]} for _, row in df.head(10).iterrows()]
             st.table(preview_rows)
 
             unmatched_upi = [idx for idx, r in df.iterrows() if trace_identity_power(r[n_c], synced)[1] == "⚠️ UPI Alert"]
             
             if len(unmatched_upi) > 5:
-                st.markdown(f'<div class="warning-box">⚠️ Found {len(unmatched_upi)} unknown UPIs. Select a Ledger:</div>', unsafe_allow_html=True)
+                st.markdown(f'<div class="warning-box">⚠️ {len(unmatched_upi)} unknown UPI entries. Select a ledger to continue:</div>', unsafe_allow_html=True)
                 upi_fix = st.selectbox("Assign unknown UPIs to:", synced)
-                if st.button("🚀 Process & Generate Tally XML"):
+                if st.button("🚀 Process & Create Tally XML"):
                     xml_data = generate_tally_xml(df, active_bank, synced, upi_fix)
                     st.balloons()
                     st.download_button("⬇️ Download tally_import.xml", xml_data, file_name="tally_import.xml")
