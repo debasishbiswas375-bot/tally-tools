@@ -26,7 +26,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. CORE LOGIC ENGINE ---
+# --- 3. SMART ENGINE FUNCTIONS ---
 
 def get_img_as_base64(file):
     try:
@@ -41,13 +41,13 @@ def extract_ledger_names(html_file):
     except: return []
 
 def trace_ledger(text, master_list):
-    """Fuzzy matching: returns ledger if found in text, else 'Suspense'."""
     if not text or pd.isna(text): return "Suspense"
     text_up = str(text).upper()
     for ledger in master_list:
         if ledger.upper() in text_up: return ledger
     return "Suspense"
 
+# THE FIX: Robust Header & Data Detection
 def load_data(file):
     fname = file.name.lower()
     try:
@@ -58,58 +58,63 @@ def load_data(file):
                     table = page.extract_table()
                     if table: all_rows.extend(table)
             df = pd.DataFrame(all_rows)
-            for i, row in df.iterrows():
-                if any(k in str(row).lower() for k in ['date', 'txn', 'description', 'narration']):
-                    df.columns = df.iloc[i]
-                    return df[i+1:].reset_index(drop=True)
-            return df
-        elif fname.endswith('.xls'):
-            return pd.read_excel(file, engine='xlrd')
         else:
-            return pd.read_excel(file)
+            # Handle both xls and xlsx
+            df = pd.read_excel(file)
+        
+        # --- SMART COLUMN SCANNER ---
+        # Find the row that contains 'Date' and use it as the header
+        for i, row in df.iterrows():
+            row_str = " ".join([str(x).lower() for x in row if x])
+            if 'date' in row_str and ('description' in row_str or 'narration' in row_str or 'particulars' in row_str):
+                df.columns = df.iloc[i]
+                return df[i+1:].reset_index(drop=True)
+        return df
     except Exception as e:
-        st.error(f"Error reading file: {e}")
+        st.error(f"Error reading statement: {e}")
         return None
 
 def generate_tally_xml(df, bank_led_sel, party_led_sel, master_list):
-    """Strictly matches the structure of 'good one.xml' sample."""
+    """Produces exact structure of 'good one.xml'."""
     xml_header = """<ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>Vouchers</REPORTNAME></REQUESTDESC><REQUESTDATA>"""
     xml_footer = """</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>"""
     xml_body = ""
     
-    # Trace Bank Ledger from first row if Premium selected
-    actual_bank = bank_led_sel
-    if "⭐" in bank_led_sel and master_list:
-        traced_bank = trace_ledger(str(df.iloc[0]), master_list)
-        actual_bank = traced_bank if traced_bank != "Suspense" else bank_led_sel.replace("⭐ AI Auto-Trace (Premium)", "").strip()
+    # Identify key columns by matching common bank keywords
+    cols = {c.lower(): c for c in df.columns}
+    date_col = next((cols[k] for k in ['date', 'txn date', 'transaction date'] if k in cols), None)
+    desc_col = next((cols[k] for k in ['narration', 'description', 'particulars', 'remarks'] if k in cols), None)
+    debit_col = next((cols[k] for k in ['debit', 'withdrawal', 'withdrawal amount'] if k in cols), None)
+    credit_col = next((cols[k] for k in ['credit', 'deposit', 'deposit amount'] if k in cols), None)
+
+    if not date_col or not desc_col:
+        st.error("⚠️ Could not find 'Date' or 'Narration' columns in your statement.")
+        return xml_header + xml_footer # Prevents empty data crash
 
     for _, row in df.iterrows():
         try:
-            # Column Normalization
-            debit = float(str(row.get('Debit', row.get('Withdrawal', 0))).replace(',', '')) if row.get('Debit') or row.get('Withdrawal') else 0
-            credit = float(str(row.get('Credit', row.get('Deposit', 0))).replace(',', '')) if row.get('Credit') or row.get('Deposit') else 0
-            narration_raw = str(row.get('Narration', row.get('Description', '')))
+            # Math logic from verified sample
+            debit = float(str(row.get(debit_col, 0)).replace(',', '')) if row.get(debit_col) else 0
+            credit = float(str(row.get(credit_col, 0)).replace(',', '')) if row.get(credit_col) else 0
+            narration_raw = str(row.get(desc_col, ''))
             
-            # Signage Logic from 'good one.xml'
             if debit > 0:
                 vch_type, amt = "Payment", debit
-                # Dr Party (Yes), Cr Bank (No)
                 led1, led1_pos, led1_amt = (party_led_sel, "Yes", -amt)
-                led2, led2_pos, led2_amt = (actual_bank, "No", amt)
+                led2, led2_pos, led2_amt = (bank_led_sel, "No", amt)
             elif credit > 0:
                 vch_type, amt = "Receipt", credit
-                # Dr Bank (Yes), Cr Party (No)
-                led1, led1_pos, led1_amt = (actual_bank, "Yes", -amt)
+                led1, led1_pos, led1_amt = (bank_led_sel, "Yes", -amt)
                 led2, led2_pos, led2_amt = (party_led_sel, "No", amt)
             else: continue
 
-            # AI Tracing with Suspense Fallback
+            # AI Matching with Suspense fallback
             if "⭐" in party_led_sel and master_list:
                 traced = trace_ledger(narration_raw, master_list)
                 if vch_type == "Payment": led1 = traced
                 else: led2 = traced
 
-            try: date_str = pd.to_datetime(row.get('Date')).strftime("%Y%m%d")
+            try: date_str = pd.to_datetime(row.get(date_col)).strftime("%Y%m%d")
             except: date_str = "20260101"
             
             clean_narration = narration_raw.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
@@ -141,7 +146,7 @@ with col1:
         st.success(f"✅ Synced {len(synced_masters)} ledgers")
         ledger_options = ["⭐ AI Auto-Trace (Premium)"] + synced_masters
     
-    bank_led = st.selectbox("Select Bank Ledger", ledger_options)
+    bank_led = st.selectbox("Select Bank Ledger", ["State Bank of India -38500202509"] + ledger_options)
     party_led = st.selectbox("Select Default Party", ledger_options)
 
 with col2:
@@ -149,6 +154,7 @@ with col2:
     bank_file = st.file_uploader("Drop Statement here (Excel or PDF)", type=['xlsx', 'xls', 'pdf'])
     if bank_file:
         if st.button("🚀 Convert to Tally XML"):
+            # The smart loader identifies column names automatically
             df = load_data(bank_file)
             if df is not None:
                 xml_data = generate_tally_xml(df, bank_led, party_led, synced_masters)
