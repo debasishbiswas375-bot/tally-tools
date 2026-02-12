@@ -15,7 +15,7 @@ st.set_page_config(
     initial_sidebar_state="auto" 
 )
 
-# --- 2. THEME & CSS (Responsive for PC & Mobile) ---
+# --- 2. THEME & CSS (MOBILE EXPAND FIX) ---
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
@@ -24,21 +24,24 @@ st.markdown("""
         /* SIDEBAR BASE STYLING */
         [data-testid="stSidebar"] { 
             background-color: #0F172A !important; 
+        }
+
+        /* FORCE ALL SIDEBAR TEXT TO WHITE */
+        [data-testid="stSidebar"] * {
             color: white !important;
-            min-width: 300px !important;
         }
-        
-        [data-testid="stSidebar"] .stText, 
-        [data-testid="stSidebar"] label, 
-        [data-testid="stSidebar"] .st-expander p,
-        [data-testid="stSidebar"] .st-expander span { 
-            color: white !important; 
-        }
-        
+
+        /* FIX EXPANDER STYLING */
         [data-testid="stSidebar"] .st-expander {
-            border: 1px solid #334155 !important;
             background-color: rgba(255, 255, 255, 0.05) !important;
-            border-radius: 8px !important;
+            border: 1px solid rgba(255, 255, 255, 0.1) !important;
+            border-radius: 10px !important;
+            margin-bottom: 10px !important;
+        }
+        
+        [data-testid="stSidebar"] .st-expander summary {
+            background-color: transparent !important;
+            color: white !important;
         }
 
         .sidebar-logo-text { font-size: 1.5rem; font-weight: 800; color: #10B981; margin-bottom: 20px; text-align: center; }
@@ -51,34 +54,35 @@ st.markdown("""
             box-shadow: 0 10px 30px -10px rgba(6, 95, 70, 0.5);
         }
 
-        /* PC VIEW SPECIFIC */
-        @media (min-width: 1024px) {
-            .hero-container { padding: 60px 20px; }
-            .stContainer { padding: 30px; }
+        /* CRITICAL: SIDEBAR TOGGLE BUTTON FIX FOR MOBILE */
+        [data-testid="stSidebarCollapsedControl"] {
+            background-color: #10B981 !important;
+            color: white !important;
+            width: 55px !important;
+            height: 55px !important;
+            border-radius: 0 12px 12px 0 !important;
+            top: 15px !important;
+            left: 0 !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+            box-shadow: 5px 5px 15px rgba(0,0,0,0.3) !important;
+            z-index: 999999 !important;
         }
 
-        /* MOBILE VIEW SPECIFIC */
+        /* Ensure the arrow icon inside the toggle is white */
+        [data-testid="stSidebarCollapsedControl"] svg {
+            fill: white !important;
+            width: 30px !important;
+            height: 30px !important;
+        }
+
         @media (max-width: 768px) {
-            .hero-container { 
-                margin: -6rem -2rem 20px -2rem; 
-                padding: 30px 10px;
-            }
+            .hero-container { margin: -6rem -2rem 20px -2rem; }
             .hero-container h1 { font-size: 1.8rem !important; }
-            
-            /* Make the Sidebar toggle button huge and green on mobile */
-            [data-testid="stSidebarCollapsedControl"] {
-                background-color: #10B981 !important;
-                color: white !important;
-                width: 60px !important;
-                height: 60px !important;
-                border-radius: 0 15px 15px 0 !important;
-                top: 10px !important;
-                left: 0 !important;
-                box-shadow: 4px 4px 15px rgba(0,0,0,0.3) !important;
-            }
         }
 
-        .stContainer { background-color: white; padding: 20px; border-radius: 16px; border: 1px solid #E2E8F0; margin-bottom: 20px; }
+        .stContainer { background-color: white; padding: 25px; border-radius: 16px; border: 1px solid #E2E8F0; margin-bottom: 20px; }
         h3 { border-left: 5px solid #10B981; padding-left: 12px; font-weight: 700 !important; color: #1e293b !important; }
 
         .stButton>button { 
@@ -86,7 +90,9 @@ st.markdown("""
             color: white; border-radius: 8px; height: 50px; font-weight: 700; border: none;
         }
         
-        #MainMenu, footer, header {visibility: hidden;}
+        /* Hide default Streamlit clutter but keep sidebar control visible */
+        header, footer {visibility: hidden;}
+        #MainMenu {visibility: hidden;}
     </style>
 """, unsafe_allow_html=True)
 
@@ -163,8 +169,10 @@ with st.sidebar:
     if side_logo_b64:
         st.markdown(f'<div style="text-align:center;"><img src="data:image/png;base64,{side_logo_b64}" width="80"></div>', unsafe_allow_html=True)
     st.markdown('<div class="sidebar-logo-text">Accounting Expert</div>', unsafe_allow_html=True)
+    
     with st.expander("👤 User Account", expanded=True):
-        st.write("User: **Debasish**")
+        st.write(f"User: **Debasish**")
+    
     with st.expander("❓ Help & Support"):
         st.write("WhatsApp: +91 9002043666")
 
@@ -174,7 +182,6 @@ hero_logo_html = f'<img src="data:image/png;base64,{hero_logo_b64}" width="100">
 
 st.markdown(f"""<div class="hero-container">{hero_logo_html}<h1 style="font-size: 2.5rem; font-weight: 800; margin-top:10px;">Accounting Expert</h1></div>""", unsafe_allow_html=True)
 
-# Column layout adjusts automatically
 col_left, col_right = st.columns([1, 1.5], gap="large")
 
 with col_left:
