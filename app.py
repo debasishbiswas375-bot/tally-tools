@@ -6,38 +6,27 @@ import io
 import base64
 
 # --- 1. PAGE CONFIGURATION ---
-st.set_page_config(
-    page_title="Accounting Expert | AI Bank to Tally",
-    page_icon="logo.png",
-    layout="wide",
-    initial_sidebar_state="collapsed"
-)
+st.set_page_config(page_title="Accounting Expert | AI Bank to Tally", page_icon="logo.png", layout="wide")
 
 # --- 2. FUTURISTIC THEME CSS ---
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
         html, body, [class*="css"] { font-family: 'Inter', sans-serif; background-color: #F8FAFC; color: #0F172A; }
-        .hero-container { text-align: center; padding: 50px 20px; background: linear-gradient(135deg, #065F46 0%, #1E40AF 100%); color: white; margin: -6rem -4rem 30px -4rem; box-shadow: 0 10px 30px -10px rgba(6, 95, 70, 0.5); position: relative; }
-        .footer { margin-top: 60px; padding: 40px; text-align: center; color: #64748B; font-size: 0.95rem; border-top: 1px solid #E2E8F0; background-color: white; margin-left: -4rem; margin-right: -4rem; margin-bottom: -6rem; }
+        .hero-container { text-align: center; padding: 40px; background: linear-gradient(135deg, #065F46 0%, #1E40AF 100%); color: white; margin: -6rem -4rem 30px -4rem; }
+        .footer { margin-top: 60px; padding: 30px; text-align: center; color: #64748B; border-top: 1px solid #E2E8F0; background-color: white; margin-left: -4rem; margin-right: -4rem; }
         .brand-link { color: #059669; text-decoration: none; font-weight: 700; }
-        .stButton>button { width: 100%; background: linear-gradient(90deg, #10B981 0%, #3B82F6 100%); color: white; border-radius: 8px; height: 55px; font-weight: 600; border: none; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3); }
+        .stButton>button { width: 100%; background: linear-gradient(90deg, #10B981 0%, #3B82F6 100%); color: white; border-radius: 8px; height: 50px; font-weight: 600; border: none; }
         #MainMenu, footer, header { visibility: hidden; }
     </style>
 """, unsafe_allow_html=True)
 
 # --- 3. CORE ENGINE FUNCTIONS ---
 
-def get_img_as_base64(file):
-    try:
-        with open(file, "rb") as f: return base64.b64encode(f.read()).decode()
-    except: return None
-
 def extract_ledger_names(html_file):
     try:
         soup = BeautifulSoup(html_file, 'html.parser')
-        ledgers = [td.text.strip() for td in soup.find_all('td') if len(td.text.strip()) > 1]
-        return sorted(list(set(ledgers)))
+        return sorted(list(set([td.text.strip() for td in soup.find_all('td') if len(td.text.strip()) > 1])))
     except: return []
 
 def trace_ledger(text, master_list):
@@ -48,7 +37,7 @@ def trace_ledger(text, master_list):
     return "Suspense"
 
 def load_data(file):
-    """FIX: Robust loader that renames duplicates to stop ValueError crash."""
+    """FIX: Aggressively cleans metadata and duplicate columns from bank files."""
     try:
         if file.name.lower().endswith('.pdf'):
             all_rows = []
@@ -58,120 +47,104 @@ def load_data(file):
                     if table: all_rows.extend(table)
             df = pd.DataFrame(all_rows)
         else:
-            df = pd.read_excel(file)
+            # Load with no header initially to find the real table start
+            df = pd.read_excel(file, header=None)
 
-        # RENAMING DUPLICATES (Fixes image_0bb480.png)
-        cols = []
-        count = {}
-        for col in df.columns:
-            c_name = str(col).strip() if not pd.isna(col) else "unnamed"
-            if c_name in count:
-                count[c_name] += 1
-                cols.append(f"{c_name}_{count[c_name]}")
-            else:
-                count[c_name] = 0
-                cols.append(c_name)
-        df.columns = cols
-
-        # Aggressive Header Finding
+        # 1. FIND REAL HEADER ROW (e.g., row containing 'TRAN DATE')
+        header_idx = 0
         for i, row in df.iterrows():
             row_str = " ".join([str(x).lower() for x in row if x])
-            if 'date' in row_str and ('narration' in row_str or 'description' in row_str):
-                df.columns = [str(c).strip() for c in df.iloc[i]]
-                # Final rename for sanity
-                df.columns = pd.io.common.dedup_names(df.columns, is_unique=False)
-                return df[i+1:].reset_index(drop=True)
-        return df
+            if 'tran date' in row_str or 'txn date' in row_str or 'narration' in row_str:
+                header_idx = i
+                break
+        
+        # 2. RECONSTRUCT DF FROM REAL START
+        df.columns = [str(c).strip().upper() if not pd.isna(c) else f"COL_{j}" for j, c in enumerate(df.iloc[header_idx])]
+        df = df[header_idx + 1:].reset_index(drop=True)
+        
+        # 3. FIX DUPLICATE COLUMNS (Fixes the ValueError)
+        cols = pd.Series(df.columns)
+        for dup in cols[cols.duplicated()].unique():
+            cols[cols[cols == dup].index.values.tolist()] = [f"{dup}_{i}" if i != 0 else dup for i in range(sum(cols == dup))]
+        df.columns = cols
+        
+        return df.dropna(subset=[df.columns[1]], thresh=1) # Remove empty decorative rows
     except Exception as e:
-        st.error(f"Critical Error: {e}")
+        st.error(f"Loader Error: {e}")
         return None
 
-def generate_tally_xml(df, bank_led_sel, party_led_sel, master_list, is_preview=False):
-    """XML generator using signage from 'good one.xml'."""
+def generate_tally_xml(df, bank_led, party_led, master_list, is_preview=False):
+    """Generates XML based on 'good one.xml' signage logic."""
     xml_header = """<ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>Vouchers</REPORTNAME></REQUESTDESC><REQUESTDATA>"""
     xml_footer = """</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>"""
     xml_body = ""
     
+    # Identify standard columns even if names vary
     cols = {str(c).lower().strip(): c for c in df.columns}
-    date_col = next((cols[k] for k in ['date', 'txn date'] if k in cols), df.columns[0])
-    desc_col = next((cols[k] for k in ['narration', 'description'] if k in cols), df.columns[1])
-    debit_col = next((cols[k] for k in ['debit', 'withdrawal', 'dr'] if k in cols), None)
-    credit_col = next((cols[k] for k in ['credit', 'deposit', 'cr'] if k in cols), None)
+    d_col = next((cols[k] for k in ['tran date', 'date', 'txn date'] if k in cols), df.columns[0])
+    n_col = next((cols[k] for k in ['narration', 'description'] if k in cols), df.columns[1])
+    dr_col = next((cols[k] for k in ['withdrawal(dr)', 'debit', 'withdrawal'] if k in cols), None)
+    cr_col = next((cols[k] for k in ['deposit(cr)', 'credit', 'deposit'] if k in cols), None)
 
-    process_rows = df.head(5) if is_preview else df
-
-    for _, row in process_rows.iterrows():
+    rows = df.head(5) if is_preview else df
+    for _, row in rows.iterrows():
         try:
-            val_dr = float(str(row.get(debit_col, 0)).replace(',', '')) if debit_col and row.get(debit_col) else 0
-            val_cr = float(str(row.get(credit_col, 0)).replace(',', '')) if credit_col and row.get(credit_col) else 0
-            nar_raw = str(row.get(desc_col, ''))
+            val_dr = float(str(row.get(dr_col, 0)).replace(',', '')) if dr_col and row.get(dr_col) else 0
+            val_cr = float(str(row.get(cr_col, 0)).replace(',', '')) if cr_col and row.get(cr_col) else 0
+            nar = str(row.get(n_col, ''))
             
             if val_dr > 0:
-                vch_type, amt = "Payment", val_dr
-                led1, led1_pos, led1_amt = (party_led_sel, "Yes", -amt)
-                led2, led2_pos, led2_amt = (bank_led_sel, "No", amt)
+                vch, amt = "Payment", val_dr
+                l1, l1p, l1a = (party_led, "Yes", -amt)
+                l2, l2p, l2a = (bank_led, "No", amt)
             elif val_cr > 0:
-                vch_type, amt = "Receipt", credit
-                led1, led1_pos, led1_amt = (bank_led_sel, "Yes", -amt)
-                led2, led2_pos, led2_amt = (party_led_sel, "No", amt)
+                vch, amt = "Receipt", val_cr
+                l1, l1p, l1a = (bank_led, "Yes", -amt)
+                l2, l2p, l2a = (party_led, "No", amt)
             else: continue
 
-            if "⭐" in party_led_sel and master_list:
-                traced = trace_ledger(nar_raw, master_list)
-                if vch_type == "Payment": led1 = traced
-                else: led2 = traced
+            if "⭐" in party_led and master_list:
+                traced = trace_ledger(nar, master_list)
+                if vch == "Payment": l1 = traced
+                else: l2 = traced
 
-            clean_nar = nar_raw.replace("&", "&amp;").replace("<", "&lt;")
-            try: d_str = pd.to_datetime(row.get(date_col)).strftime("%Y%m%d")
-            except: d_str = "20260101"
+            clean_nar = nar.replace("&", "&amp;").replace("<", "&lt;")
+            try: dt = pd.to_datetime(row.get(d_col)).strftime("%Y%m%d")
+            except: dt = "20260101"
 
-            xml_body += f"""<TALLYMESSAGE xmlns:UDF="TallyUDF"><VOUCHER VCHTYPE="{vch_type}" ACTION="Create" OBJVIEW="Accounting Voucher View"><DATE>{d_str}</DATE><NARRATION>{clean_nar}</NARRATION><VOUCHERTYPENAME>{vch_type}</VOUCHERTYPENAME><ALLLEDGERENTRIES.LIST><LEDGERNAME>{led1}</LEDGERNAME><ISDEEMEDPOSITIVE>{led1_pos}</ISDEEMEDPOSITIVE><AMOUNT>{led1_amt}</AMOUNT></ALLLEDGERENTRIES.LIST><ALLLEDGERENTRIES.LIST><LEDGERNAME>{led2}</LEDGERNAME><ISDEEMEDPOSITIVE>{led2_pos}</ISDEEMEDPOSITIVE><AMOUNT>{led2_amt}</AMOUNT></ALLLEDGERENTRIES.LIST></VOUCHER></TALLYMESSAGE>"""
+            xml_body += f"""<TALLYMESSAGE xmlns:UDF="TallyUDF"><VOUCHER VCHTYPE="{vch}" ACTION="Create" OBJVIEW="Accounting Voucher View"><DATE>{dt}</DATE><NARRATION>{clean_nar}</NARRATION><VOUCHERTYPENAME>{vch}</VOUCHERTYPENAME><ALLLEDGERENTRIES.LIST><LEDGERNAME>{l1}</LEDGERNAME><ISDEEMEDPOSITIVE>{l1p}</ISDEEMEDPOSITIVE><AMOUNT>{l1a}</AMOUNT></ALLLEDGERENTRIES.LIST><ALLLEDGERENTRIES.LIST><LEDGERNAME>{l2}</LEDGERNAME><ISDEEMEDPOSITIVE>{l2p}</ISDEEMEDPOSITIVE><AMOUNT>{l2a}</AMOUNT></ALLLEDGERENTRIES.LIST></VOUCHER></TALLYMESSAGE>"""
         except: continue
     return xml_body if is_preview else xml_header + xml_body + xml_footer
 
-# --- 4. UI DASHBOARD ---
+# --- 4. UI SECTIONS ---
+hero_logo_b64 = base64.b64encode(open("logo.png", "rb").read()).decode() if io.open("logo.png", "rb") else ""
+st.markdown(f'<div class="hero-container"><img src="data:image/png;base64,{hero_logo_b64}" width="100"><h1>Accounting Expert</h1></div>', unsafe_allow_html=True)
 
-hero_logo = get_img_as_base64("logo.png")
-hero_html = f'<img src="data:image/png;base64,{hero_logo}" width="120">' if hero_logo else ""
-st.markdown(f'<div class="hero-container">{hero_html}<div style="font-size:3.5rem; font-weight:800;">Accounting Expert</div></div>', unsafe_allow_html=True)
+col1, col2 = st.columns([1, 1.5], gap="large")
 
-c1, c2 = st.columns([1, 1.5], gap="large")
+with col1:
+    st.markdown("### 🛠️ 1. Settings")
+    master = st.file_uploader("Upload Tally Master", type=['html'])
+    synced, options = [], ["Upload Master.html first"]
+    if master:
+        synced = extract_ledger_names(master)
+        st.success(f"✅ Synced {len(synced)} ledgers")
+        options = ["⭐ AI Auto-Trace (Premium)"] + synced
+    bank_led = st.selectbox("Select Bank Ledger", options)
+    party_led = st.selectbox("Default Party", options)
 
-with c1:
-    st.markdown("### 🛠️ 1. Settings & Mapping")
-    master_file = st.file_uploader("Upload Tally Master (Optional)", type=['html'])
-    synced_masters, ledger_options = [], ["Upload Master.html first"]
-    if master_file:
-        synced_masters = extract_ledger_names(master_file)
-        st.success(f"✅ Synced {len(synced_masters)} ledgers")
-        ledger_options = ["⭐ AI Auto-Trace (Premium)"] + synced_masters
-    
-    bank_led = st.selectbox("Select Bank Ledger", ledger_options)
-    party_led = st.selectbox("Select Default Party", ledger_options)
-
-with c2:
-    st.markdown("### 📂 2. Upload & Convert")
+with col2:
+    st.markdown("### 📂 2. Convert")
     bank_file = st.file_uploader("Drop Statement here", type=['xlsx', 'xls', 'pdf'])
     if bank_file:
         df = load_data(bank_file)
         if df is not None:
-            st.markdown("🔍 **Data Preview**")
             st.dataframe(df.head(3), use_container_width=True)
-            
             if st.button("🚀 Convert to Tally XML"):
-                # --- LIVE TALLY-STYLE PREVIEW ---
-                st.markdown("📈 **Tally-style Accounting Preview**")
-                xml_data = generate_tally_xml(df, bank_led, party_led, synced_masters)
-                
-                # Show first 5 matches in a code block for verification
-                preview_xml = generate_tally_xml(df, bank_led, party_led, synced_masters, is_preview=True)
-                st.code(preview_xml, language='xml')
-                
-                st.balloons()
+                xml_data = generate_tally_xml(df, bank_led, party_led, synced)
+                st.code(generate_tally_xml(df, bank_led, party_led, synced, True), language='xml')
                 st.success("Premium AI Match Complete!")
-                st.download_button("⬇️ Download Tally XML File", xml_data, "tally_import.xml", use_container_width=True)
+                st.download_button("⬇️ Download XML", xml_data, "tally_import.xml", use_container_width=True)
 
-# --- 5. BRANDED FOOTER ---
-s_logo = get_img_as_base64("logo 1.png")
-s_html = f'<img src="data:image/png;base64,{s_logo}" width="25" style="vertical-align:middle; margin-right:5px;">' if s_logo else ""
-st.markdown(f"""<div class="footer"><p>Sponsored By {s_html} <span class="brand-link" style="color:#0F172A;">Uday Mondal</span> | Consultant Advocate</p><p style="font-size: 13px;">Powered & Created by <span class="brand-link">Debasish Biswas</span></p></div>""", unsafe_allow_html=True)
+# --- 5. FOOTER ---
+st.markdown("""<div class="footer"><p>Sponsored By <span class="brand-link">Uday Mondal</span> | Consultant Advocate</p><p style="font-size:12px;">Created by <span class="brand-link">Debasish Biswas</span></p></div>""", unsafe_allow_html=True)
