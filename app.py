@@ -6,12 +6,7 @@ import io
 import base64
 
 # --- 1. PAGE CONFIGURATION ---
-st.set_page_config(
-    page_title="Accounting Expert | AI Bank to Tally",
-    page_icon="logo.png",
-    layout="wide",
-    initial_sidebar_state="collapsed"
-)
+st.set_page_config(page_title="Accounting Expert | AI Bank to Tally", page_icon="logo.png", layout="wide")
 
 # --- 2. FUTURISTIC THEME CSS ---
 st.markdown("""
@@ -47,6 +42,21 @@ def trace_ledger(remark, master_list):
         if ledger.upper() in remark_up: return ledger
     return "Suspense"
 
+# --- THE FIX: SMART FILE LOADER ---
+def load_data(file):
+    if file.name.lower().endswith('.pdf'):
+        all_rows = []
+        with pdfplumber.open(file) as pdf:
+            for page in pdf.pages:
+                table = page.extract_table()
+                if table: all_rows.extend(table)
+        df = pd.DataFrame(all_rows)
+        # Basic cleaning for PDF headers
+        df.columns = df.iloc[0]
+        return df[1:].reset_index(drop=True)
+    else:
+        return pd.read_excel(file)
+
 def generate_tally_xml(df, bank_ledger, default_party, master_list):
     xml_header = """<ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>Vouchers</REPORTNAME></REQUESTDESC><REQUESTDATA>"""
     xml_footer = """</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>"""
@@ -54,23 +64,19 @@ def generate_tally_xml(df, bank_ledger, default_party, master_list):
     
     for _, row in df.iterrows():
         try:
-            # Logic based on your provided sample
             debit = float(str(row.get('Debit', 0)).replace(',', '')) if row.get('Debit') else 0
             credit = float(str(row.get('Credit', 0)).replace(',', '')) if row.get('Credit') else 0
             
             if debit > 0:
                 vch_type, amt = "Payment", debit
-                # Payment: Suspense (Dr) is Yes, Bank (Cr) is No
                 led1, led1_pos, led1_amt = (default_party, "Yes", -amt)
                 led2, led2_pos, led2_amt = (bank_ledger, "No", amt)
             elif credit > 0:
                 vch_type, amt = "Receipt", credit
-                # Receipt: Bank (Dr) is Yes, Suspense (Cr) is No
                 led1, led1_pos, led1_amt = (bank_ledger, "Yes", -amt)
                 led2, led2_pos, led2_amt = (default_party, "No", amt)
             else: continue
 
-            # ⭐ AI Tracing
             if "⭐" in default_party and master_list:
                 traced = trace_ledger(row.get('Narration', ''), master_list)
                 if vch_type == "Payment": led1 = traced
@@ -88,7 +94,7 @@ def generate_tally_xml(df, bank_ledger, default_party, master_list):
         except: continue
     return xml_header + xml_body + xml_footer
 
-# --- 4. UI DASHBOARD ---
+# --- 4. DASHBOARD UI ---
 
 hero_logo = get_img_as_base64("logo.png")
 hero_html = f'<img src="data:image/png;base64,{hero_logo}" width="120">' if hero_logo else ""
@@ -114,8 +120,8 @@ with col2:
     bank_file = st.file_uploader("Drop Statement here (Excel or PDF)", type=['xlsx', 'pdf'])
     if bank_file:
         if st.button("🚀 Convert to Tally XML"):
-            # This triggers the engine using your sample logic
-            df = pd.read_excel(bank_file) # Placeholder for full loader
+            # Fixed call to the new load_data function
+            df = load_data(bank_file)
             xml_data = generate_tally_xml(df, bank_led, party_led, synced_masters)
             st.balloons()
             st.success("Premium AI Match Complete!")
