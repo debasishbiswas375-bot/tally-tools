@@ -7,69 +7,128 @@ import base64
 import re
 
 # --- 1. PAGE CONFIGURATION ---
-st.set_page_config(page_title="Accounting Expert", layout="wide", initial_sidebar_state="collapsed")
+st.set_page_config(
+    page_title="Accounting Expert | AI Bank to Tally",
+    page_icon="logo.png",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
 
-# --- 2. THE DESIGN (Style) ---
+# --- 2. IMAGE HANDLER (Prevents Errors if Logos are missing) ---
+def get_img_as_base64(file):
+    try:
+        with open(file, "rb") as f:
+            return base64.b64encode(f.read()).decode()
+    except: return None
+
+# --- 3. THE STYLE BLOCK (Your Design) ---
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
         html, body, [class*="css"] { font-family: 'Inter', sans-serif; background-color: #F8FAFC; }
         .hero-container { text-align: center; padding: 50px; background: linear-gradient(135deg, #065F46 0%, #1E40AF 100%); color: white; margin: -6rem -4rem 30px -4rem; }
+        .bank-detect-box { background-color: #E0F2FE; border: 1px solid #3B82F6; padding: 15px; border-radius: 12px; color: #1E3A8A; font-weight: 700; margin-bottom: 20px; text-align: center; border-left: 8px solid #3B82F6; }
+        .warning-box { background-color: #FEF2F2; border: 1px solid #EF4444; padding: 15px; border-radius: 10px; margin: 15px 0; color: #991B1B; font-weight: 600; border-left: 8px solid #EF4444; }
         .stButton>button { width: 100%; background: #10B981; color: white; height: 55px; font-weight: 600; border-radius: 12px; border: none; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3); }
-        .footer { position: fixed; left: 0; bottom: 0; width: 100%; background-color: white; text-align: center; padding: 10px 0; border-top: 1px solid #E2E8F0; z-index: 1000; font-size: 0.85rem; }
-        .main-content { padding-bottom: 110px; }
+        .footer { position: fixed; left: 0; bottom: 0; width: 100%; background-color: white; color: #64748B; text-align: center; padding: 12px 0; border-top: 1px solid #E2E8F0; z-index: 1000; font-size: 0.85rem; }
+        .main-content { padding-bottom: 120px; }
         #MainMenu, footer, header { visibility: hidden; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. CORE ENGINES ---
-def extract_ledgers(html_file):
+# --- 4. CORE ENGINE ---
+
+def extract_ledger_names(html_file):
     try:
         soup = BeautifulSoup(html_file, 'html.parser')
         return sorted(list(set([td.text.strip() for td in soup.find_all('td') if len(td.text.strip()) > 1])))
     except: return []
 
-def trace_identity(narration, master_list):
+def trace_identity_power(narration, master_list):
     if not narration or pd.isna(narration): return "Suspense", "None"
-    nar_up = str(narration).upper()
+    nar_up = str(narration).upper().replace('/', ' ')
     sorted_masters = sorted(master_list, key=len, reverse=True)
     for ledger in sorted_masters:
-        if re.search(rf"\b{re.escape(ledger.upper())}\b", nar_up): return ledger, "🎯 Match"
-    return "Untraced", "⚠️ UPI Alert" if "UPI" in nar_up else "None"
+        if re.search(rf"\b{re.escape(ledger.upper())}\b", nar_up):
+            return ledger, "🎯 Direct Match"
+    if "UPI" in nar_up: return "Untraced", "⚠️ UPI Alert"
+    return "Suspense", "None"
 
-def generate_xml(df, bank_led, synced, upi_fix=None):
+def generate_tally_xml(df, bank_led, synced, upi_fix_led=None):
     xml_header = """<?xml version="1.0"?><ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>Vouchers</REPORTNAME></REQUESTDESC><REQUESTDATA>"""
     xml_footer = """</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>"""
     xml_body = ""
-    # Simplified logic for the body
+    # Simplified XML Row Logic
     for _, row in df.iterrows():
-        target, status = trace_identity(row.iloc[1], synced)
-        if status == "⚠️ UPI Alert" and upi_fix: target = upi_fix
-        # ... (Tally XML Row Construction) ...
         xml_body += f"<TALLYMESSAGE><VOUCHER><DATE>20260212</DATE><NARRATION>{row.iloc[1]}</NARRATION></VOUCHER></TALLYMESSAGE>"
     return xml_header + xml_body + xml_footer
 
-# --- 4. UI ---
-st.markdown('<div class="hero-container"><h1>Accounting Expert</h1></div>', unsafe_allow_html=True)
-st.markdown('<div class="main-content">', unsafe_allow_html=True)
+def load_data(file):
+    try:
+        if file.name.lower().endswith('.pdf'):
+            with pdfplumber.open(file) as pdf:
+                all_data = [row for page in pdf.pages for row in (page.extract_table() or [])]
+            df = pd.DataFrame(all_data)
+        else:
+            df = pd.read_excel(file, header=None)
+        
+        for i, row in df.iterrows():
+            row_str = " ".join([str(x).lower() for x in row if x])
+            if 'narration' in row_str and 'date' in row_str:
+                df.columns = [str(c).strip().upper() for c in df.iloc[i]]
+                return df[i+1:].reset_index(drop=True).dropna(subset=[df.columns[1]], thresh=1), df.iloc[:i]
+        return None, None
+    except: return None, None
 
+# --- 5. UI IMPLEMENTATION ---
+l_top = get_img_as_base64("logo.png")
+l_top_h = f'<img src="data:image/png;base64,{l_top}" width="80">' if l_top else ""
+st.markdown(f'<div class="hero-container">{l_top_h}<h1>Accounting Expert</h1></div>', unsafe_allow_html=True)
+
+st.markdown('<div class="main-content">', unsafe_allow_html=True)
 c1, c2 = st.columns([1, 1.5], gap="large")
+
 with c1:
+    st.markdown("### 🛠️ 1. Settings")
     master = st.file_uploader("Upload Tally Master", type=['html'])
-    synced = extract_ledgers(master) if master else []
-    bank_choice = st.selectbox("Bank Ledger", ["⭐ Auto-Detect"] + synced)
+    synced = extract_ledger_names(master) if master else []
+    if synced: st.toast(f"✅ {len(synced)} Ledgers Synced!")
+    bank_choice = st.selectbox("Select Bank Account", ["⭐ Auto-Detect"] + synced)
 
 with c2:
-    bank_file = st.file_uploader("Upload BOB Statement", type=['xlsx', 'xls', 'pdf'])
+    st.markdown("### 📂 2. Convert & Preview")
+    bank_file = st.file_uploader("Upload Statement", type=['xlsx', 'xls', 'pdf'])
     if bank_file and master:
-        # Load and Preview
-        df = pd.read_excel(bank_file) if not bank_file.name.endswith('.pdf') else pd.DataFrame()
-        st.table(df.head(5)) # Preview
-        
-        if st.button("🚀 Convert to Tally XML"):
-            st.balloons()
-            xml_data = generate_xml(df, bank_choice, synced)
-            # THIS IS THE MISSING BUTTON
-            st.download_button("⬇️ Download tally_import.xml", xml_data, "tally_import.xml", "application/xml")
+        df, meta = load_data(bank_file)
+        if df is not None:
+            active_bank = bank_choice
+            if bank_choice == "⭐ Auto-Detect" and "0138" in str(meta.values).upper():
+                active_bank = next((l for l in synced if "0138" in l), bank_choice)
+            
+            st.markdown(f'<div class="bank-detect-box">🏦 Bank Account: <b>{active_bank}</b></div>', unsafe_allow_html=True)
+            
+            n_c = next((c for c in df.columns if 'NARRATION' in str(c)), df.columns[1])
+            unmatched = [idx for idx, r in df.iterrows() if trace_identity_power(r[n_c], synced)[1] == "⚠️ UPI Alert"]
+            
+            st.table([{"Narration": str(row[n_c])[:50], "Target": trace_identity_power(row[n_c], synced)[0]} for _, row in df.head(5).iterrows()])
 
-st.markdown('<div class="footer">Sponsored By <b>Uday Mondal</b> | Created by <b>Debasish Biswas</b></div>', unsafe_allow_html=True)
+            # DOWNLOAD LOGIC
+            if len(unmatched) > 5:
+                st.markdown(f'<div class="warning-box">⚠️ {len(unmatched)} Untraced Items Found!</div>', unsafe_allow_html=True)
+                upi_fix = st.selectbox("Assign Untraced to:", synced)
+                if st.button("🚀 Process & Create Tally XML"):
+                    st.balloons()
+                    xml = generate_tally_xml(df, active_bank, synced, upi_fix)
+                    st.download_button("⬇️ Download tally_import.xml", xml, "tally_import.xml")
+            else:
+                if st.button("🚀 Convert to Tally XML"):
+                    st.balloons()
+                    xml = generate_tally_xml(df, active_bank, synced)
+                    st.download_button("⬇️ Download tally_import.xml", xml, "tally_import.xml")
+
+st.markdown('</div>', unsafe_allow_html=True)
+
+# Footer
+l_foot = get_img_as_base64("logo 1.png")
+l_foot_h = f'<img src="data:image/png;base64,{l_foot}" width="25">' if l_foot else ""
+st.markdown(f'<div class="footer">{l_foot_h} Sponsored By <b>Uday Mondal</b> | Created by <b>Debasish Biswas</b></div>', unsafe_allow_html=True)
