@@ -12,22 +12,22 @@ st.set_page_config(
     page_title="Accounting Expert | AI Bank to Tally", 
     page_icon="logo.png",
     layout="wide",
-    initial_sidebar_state="expanded" 
+    initial_sidebar_state="auto" 
 )
 
-# --- 2. THEME & CSS ---
+# --- 2. THEME & CSS (Responsive for PC & Mobile) ---
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
         html, body, [class*="css"] { font-family: 'Inter', sans-serif; background-color: #F8FAFC; }
         
-        /* SIDEBAR STYLING */
+        /* SIDEBAR BASE STYLING */
         [data-testid="stSidebar"] { 
             background-color: #0F172A !important; 
-            color: white !important; 
+            color: white !important;
+            min-width: 300px !important;
         }
         
-        /* Fix sidebar text and expander visibility */
         [data-testid="stSidebar"] .stText, 
         [data-testid="stSidebar"] label, 
         [data-testid="stSidebar"] .st-expander p,
@@ -35,7 +35,6 @@ st.markdown("""
             color: white !important; 
         }
         
-        /* Style the expander border to make it visible */
         [data-testid="stSidebar"] .st-expander {
             border: 1px solid #334155 !important;
             background-color: rgba(255, 255, 255, 0.05) !important;
@@ -43,29 +42,43 @@ st.markdown("""
         }
 
         .sidebar-logo-text { font-size: 1.5rem; font-weight: 800; color: #10B981; margin-bottom: 20px; text-align: center; }
-        
-        /* MOBILE SIDEBAR BUTTON FIX - Making it very visible */
-        [data-testid="stSidebarCollapsedControl"] {
-            background-color: #10B981 !important; /* Bright Green */
-            color: white !important;
-            border-radius: 0 10px 10px 0;
-            top: 20px;
-            width: 50px;
-            height: 50px;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 2px 2px 10px rgba(0,0,0,0.2);
-        }
 
+        /* HERO SECTION */
         .hero-container {
-            text-align: center; padding: 50px 20px;
+            text-align: center; padding: 40px 10px;
             background: linear-gradient(135deg, #065F46 0%, #1E40AF 100%);
-            color: white; margin: -6rem -4rem 30px -4rem;
+            color: white; margin: -6rem -4rem 20px -4rem;
             box-shadow: 0 10px 30px -10px rgba(6, 95, 70, 0.5);
         }
-        
-        .stContainer { background-color: white; padding: 25px; border-radius: 16px; border: 1px solid #E2E8F0; margin-bottom: 20px; }
+
+        /* PC VIEW SPECIFIC */
+        @media (min-width: 1024px) {
+            .hero-container { padding: 60px 20px; }
+            .stContainer { padding: 30px; }
+        }
+
+        /* MOBILE VIEW SPECIFIC */
+        @media (max-width: 768px) {
+            .hero-container { 
+                margin: -6rem -2rem 20px -2rem; 
+                padding: 30px 10px;
+            }
+            .hero-container h1 { font-size: 1.8rem !important; }
+            
+            /* Make the Sidebar toggle button huge and green on mobile */
+            [data-testid="stSidebarCollapsedControl"] {
+                background-color: #10B981 !important;
+                color: white !important;
+                width: 60px !important;
+                height: 60px !important;
+                border-radius: 0 15px 15px 0 !important;
+                top: 10px !important;
+                left: 0 !important;
+                box-shadow: 4px 4px 15px rgba(0,0,0,0.3) !important;
+            }
+        }
+
+        .stContainer { background-color: white; padding: 20px; border-radius: 16px; border: 1px solid #E2E8F0; margin-bottom: 20px; }
         h3 { border-left: 5px solid #10B981; padding-left: 12px; font-weight: 700 !important; color: #1e293b !important; }
 
         .stButton>button { 
@@ -77,7 +90,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. HELPER & LOGIC FUNCTIONS ---
+# --- 3. HELPER FUNCTIONS ---
 
 def get_img_as_base64(file):
     try:
@@ -141,27 +154,14 @@ def generate_tally_xml(df, bank_ledger):
         try: d = pd.to_datetime(row['Date'], dayfirst=True).strftime("%Y%m%d")
         except: d = "20260401"
         nar = str(row['Narration']).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-        body += f"""<TALLYMESSAGE xmlns:UDF="TallyUDF">
-         <VOUCHER VCHTYPE="{vch_type}" ACTION="Create">
-          <DATE>{d}</DATE>
-          <NARRATION>{nar}</NARRATION>
-          <ALLLEDGERENTRIES.LIST>
-           <LEDGERNAME>{l1}</LEDGERNAME>
-           <AMOUNT>{-l1_amt}</AMOUNT>
-          </ALLLEDGERENTRIES.LIST>
-          <ALLLEDGERENTRIES.LIST>
-           <LEDGERNAME>{l2}</LEDGERNAME>
-           <AMOUNT>{-l2_amt}</AMOUNT>
-          </ALLLEDGERENTRIES.LIST>
-         </VOUCHER>
-        </TALLYMESSAGE>"""
+        body += f"""<TALLYMESSAGE xmlns:UDF="TallyUDF"><VOUCHER VCHTYPE="{vch_type}" ACTION="Create"><DATE>{d}</DATE><NARRATION>{nar}</NARRATION><ALLLEDGERENTRIES.LIST><LEDGERNAME>{l1}</LEDGERNAME><AMOUNT>{-l1_amt}</AMOUNT></ALLLEDGERENTRIES.LIST><ALLLEDGERENTRIES.LIST><LEDGERNAME>{l2}</LEDGERNAME><AMOUNT>{-l2_amt}</AMOUNT></ALLLEDGERENTRIES.LIST></VOUCHER></TALLYMESSAGE>"""
     return xml_header + body + xml_footer
 
 # --- 4. SIDEBAR ---
 with st.sidebar:
     side_logo_b64 = get_img_as_base64("logo.png")
     if side_logo_b64:
-        st.markdown(f'<div style="text-align:center;"><img src="data:image/png;base64,{side_logo_b64}" width="100"></div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="text-align:center;"><img src="data:image/png;base64,{side_logo_b64}" width="80"></div>', unsafe_allow_html=True)
     st.markdown('<div class="sidebar-logo-text">Accounting Expert</div>', unsafe_allow_html=True)
     with st.expander("👤 User Account", expanded=True):
         st.write("User: **Debasish**")
@@ -172,8 +172,9 @@ with st.sidebar:
 hero_logo_b64 = get_img_as_base64("logo.png")
 hero_logo_html = f'<img src="data:image/png;base64,{hero_logo_b64}" width="100">' if hero_logo_b64 else ""
 
-st.markdown(f"""<div class="hero-container">{hero_logo_html}<h1 style="font-size: 2.8rem; font-weight: 800;">Accounting Expert</h1></div>""", unsafe_allow_html=True)
+st.markdown(f"""<div class="hero-container">{hero_logo_html}<h1 style="font-size: 2.5rem; font-weight: 800; margin-top:10px;">Accounting Expert</h1></div>""", unsafe_allow_html=True)
 
+# Column layout adjusts automatically
 col_left, col_right = st.columns([1, 1.5], gap="large")
 
 with col_left:
