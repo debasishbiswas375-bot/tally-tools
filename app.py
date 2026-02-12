@@ -14,49 +14,50 @@ st.set_page_config(
     initial_sidebar_state="expanded" 
 )
 
-# --- 2. UNIFIED CYBER-DARK THEME CSS ---
+# --- 2. UNIFIED BACKGROUND CSS ---
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
         
-        /* Unified Background for Main and Sidebar */
-        .main, [data-testid="stSidebar"], html, body, [class*="css"] {
+        /* Apply the deep navy color to every background element */
+        .stApp, [data-testid="stSidebar"], .main, .stSidebarContent, html, body {
+            background-color: #0F172A !important;
             font-family: 'Inter', sans-serif;
-            background-color: #0F172A !important; /* Deep Navy Background */
-            color: #E2E8F0 !important;
+            color: #F8FAFC !important;
         }
 
-        /* Sidebar Specifics */
+        /* Ensure sidebar text and icons remain white */
         [data-testid="stSidebar"] * { color: white !important; }
         .sidebar-logo-text { font-size: 1.4rem; font-weight: 800; color: white; text-align: center; margin-bottom: 20px; }
         .sidebar-footer-text { font-size: 12px; color: #94A3B8; text-align: center; margin-top: 30px; }
 
-        /* Hero Container (Green to Blue Gradient) */
+        /* Hero Header (Gradient Overlay) */
         .hero-container {
             text-align: center; padding: 40px 20px;
             background: linear-gradient(135deg, #065F46 0%, #1E40AF 100%);
             color: white; margin: -6rem -4rem 30px -4rem;
-            box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.5);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
         
-        /* Container Cards (Glassmorphism effect) */
+        /* Input Cards (Glass-Dark Effect) */
         .stContainer, div[data-testid="stVerticalBlock"] > div:has(div.stMarkdown) {
-            background: rgba(30, 41, 59, 0.5);
+            background: rgba(30, 41, 59, 0.7) !important;
             backdrop-filter: blur(10px);
             padding: 25px; border-radius: 16px; 
             border: 1px solid rgba(255, 255, 255, 0.1);
             margin-bottom: 20px;
         }
 
-        h3 { border-left: 5px solid #10B981; padding-left: 12px; font-weight: 700 !important; color: white !important; }
+        h1, h2, h3, p, span, label { color: white !important; }
+        h3 { border-left: 5px solid #10B981; padding-left: 12px; font-weight: 700 !important; }
 
         /* Buttons */
         .stButton>button { 
             width: 100%; background: linear-gradient(90deg, #10B981, #3B82F6); 
-            color: white; border-radius: 8px; height: 50px; font-weight: 700; border: none;
+            color: white !important; border-radius: 8px; height: 50px; font-weight: 700; border: none;
         }
         
-        /* Hide Default Elements */
+        /* Hide default Streamlit overlays */
         #MainMenu, footer, header {visibility: hidden;}
     </style>
 """, unsafe_allow_html=True)
@@ -69,7 +70,7 @@ def get_img_as_base64(file):
     except: return None
 
 def smart_normalize(df):
-    """Deep Scanner to find headers even if they are malformed."""
+    """Deep Scanner to find headers and prevent empty XML exports."""
     if df is None or df.empty: return pd.DataFrame()
     df = df.dropna(how='all').reset_index(drop=True)
     
@@ -97,11 +98,11 @@ def smart_normalize(df):
         new_df[target] = df[found] if found else (0.0 if target in ['Debit', 'Credit'] else "UNTRACED")
     return new_df.dropna(subset=['Date'])
 
-# --- 4. PERSISTENT SIDEBAR (LOGO, TITLE, HUB, SPONSOR) ---
+# --- 4. PERSISTENT SIDEBAR ---
 with st.sidebar:
     side_logo_b64 = get_img_as_base64("logo.png")
     if side_logo_b64:
-        st.markdown(f'<div style="text-align:center;"><img src="data:image/png;base64,{side_logo_b64}" width="100"></div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="text-align:center;"><img src="data:image/png;base64,{side_logo_b64}" width="120"></div>', unsafe_allow_html=True)
     st.markdown('<div class="sidebar-logo-text">Accounting Expert</div>', unsafe_allow_html=True)
     
     with st.expander("👤 User Account", expanded=True):
@@ -114,9 +115,10 @@ with st.sidebar:
     with st.expander("❓ Help & Support"):
         st.write("WhatsApp: +91 9002043666")
 
+    # Sponsored Footer at bottom of Sidebar
     st.markdown('<div style="height: 100px;"></div>', unsafe_allow_html=True)
     footer_logo_b64 = get_img_as_base64("logo 1.png")
-    footer_logo_html = f'<img src="data:image/png;base64,{footer_logo_b64}" width="20">' if footer_logo_b64 else ""
+    footer_logo_html = f'<img src="data:image/png;base64,{footer_logo_b64}" width="20" style="vertical-align: middle;">' if footer_logo_b64 else ""
     
     st.markdown(f"""
         <div class="sidebar-footer-text">
@@ -127,7 +129,7 @@ with st.sidebar:
         </div>
     """, unsafe_allow_html=True)
 
-# --- 5. MAIN DASHBOARD AREA ---
+# --- 5. MAIN DASHBOARD ---
 hero_logo_b64 = get_img_as_base64("logo.png")
 hero_logo_html = f'<img src="data:image/png;base64,{hero_logo_b64}" width="100" style="margin-bottom:15px;">' if hero_logo_b64 else ""
 
@@ -144,7 +146,7 @@ col_left, col_right = st.columns([1, 1.5], gap="large")
 with col_left:
     with st.container():
         st.markdown("### 🛠️ 1. Settings")
-        master = st.file_uploader("Upload Tally Master", type=['html'])
+        master = st.file_uploader("Upload Tally Master (HTML)", type=['html'])
         ledger_list = ["Suspense A/c", "Cash", "Bank"]
         if master:
             soup = BeautifulSoup(master, 'html.parser')
@@ -180,7 +182,8 @@ with col_right:
                     
                     if st.button("🚀 GENERATE XML"):
                         st.balloons()
-                        # XML logic remains here
+                        # XML logic resides here
                 else:
                     status.update(label="❌ Detection Failed", state="error")
                     st.error("I couldn't find the Date/Narration headers. Please check the PDF format.")
+                    
