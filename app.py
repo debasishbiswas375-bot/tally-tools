@@ -13,7 +13,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# --- 2. FUTURISTIC THEME CSS ---
+# --- 2. FUTURISTIC THEME CSS (UNCHANGED) ---
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600;700&display=swap');
@@ -26,7 +26,7 @@ st.markdown("""
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. SMART ENGINE FUNCTIONS ---
+# --- 3. HELPER & ENGINE FUNCTIONS ---
 
 def get_img_as_base64(file):
     try:
@@ -47,7 +47,6 @@ def trace_ledger(text, master_list):
         if ledger.upper() in text_up: return ledger
     return "Suspense"
 
-# THE FIX: Robust Header & Data Detection
 def load_data(file):
     fname = file.name.lower()
     try:
@@ -59,14 +58,12 @@ def load_data(file):
                     if table: all_rows.extend(table)
             df = pd.DataFrame(all_rows)
         else:
-            # Handle both xls and xlsx
             df = pd.read_excel(file)
         
-        # --- SMART COLUMN SCANNER ---
-        # Find the row that contains 'Date' and use it as the header
+        # Smart Column Detection
         for i, row in df.iterrows():
             row_str = " ".join([str(x).lower() for x in row if x])
-            if 'date' in row_str and ('description' in row_str or 'narration' in row_str or 'particulars' in row_str):
+            if 'date' in row_str and ('description' in row_str or 'narration' in row_str):
                 df.columns = df.iloc[i]
                 return df[i+1:].reset_index(drop=True)
         return df
@@ -80,48 +77,48 @@ def generate_tally_xml(df, bank_led_sel, party_led_sel, master_list):
     xml_footer = """</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>"""
     xml_body = ""
     
-    # Identify key columns by matching common bank keywords
-    cols = {c.lower(): c for c in df.columns}
-    date_col = next((cols[k] for k in ['date', 'txn date', 'transaction date'] if k in cols), None)
-    desc_col = next((cols[k] for k in ['narration', 'description', 'particulars', 'remarks'] if k in cols), None)
-    debit_col = next((cols[k] for k in ['debit', 'withdrawal', 'withdrawal amount'] if k in cols), None)
-    credit_col = next((cols[k] for k in ['credit', 'deposit', 'deposit amount'] if k in cols), None)
+    # Trace Bank from file content if Auto-Trace is chosen
+    actual_bank = bank_led_sel
+    if "⭐" in bank_led_sel and master_list:
+        # Check first few rows/headers for bank keywords
+        found_bank = trace_ledger(str(df.iloc[0:2]), master_list)
+        if found_bank != "Suspense": actual_bank = found_bank
 
-    if not date_col or not desc_col:
-        st.error("⚠️ Could not find 'Date' or 'Narration' columns in your statement.")
-        return xml_header + xml_footer # Prevents empty data crash
+    cols = {c.lower(): c for c in df.columns}
+    date_col = next((cols[k] for k in ['date', 'txn date'] if k in cols), None)
+    desc_col = next((cols[k] for k in ['narration', 'description'] if k in cols), None)
+    debit_col = next((cols[k] for k in ['debit', 'withdrawal'] if k in cols), None)
+    credit_col = next((cols[k] for k in ['credit', 'deposit'] if k in cols), None)
 
     for _, row in df.iterrows():
         try:
-            # Math logic from verified sample
             debit = float(str(row.get(debit_col, 0)).replace(',', '')) if row.get(debit_col) else 0
             credit = float(str(row.get(credit_col, 0)).replace(',', '')) if row.get(credit_col) else 0
-            narration_raw = str(row.get(desc_col, ''))
+            nar_raw = str(row.get(desc_col, ''))
             
             if debit > 0:
                 vch_type, amt = "Payment", debit
                 led1, led1_pos, led1_amt = (party_led_sel, "Yes", -amt)
-                led2, led2_pos, led2_amt = (bank_led_sel, "No", amt)
+                led2, led2_pos, led2_amt = (actual_bank, "No", amt)
             elif credit > 0:
                 vch_type, amt = "Receipt", credit
-                led1, led1_pos, led1_amt = (bank_led_sel, "Yes", -amt)
+                led1, led1_pos, led1_amt = (actual_bank, "Yes", -amt)
                 led2, led2_pos, led2_amt = (party_led_sel, "No", amt)
             else: continue
 
-            # AI Matching with Suspense fallback
             if "⭐" in party_led_sel and master_list:
-                traced = trace_ledger(narration_raw, master_list)
+                traced = trace_ledger(nar_raw, master_list)
                 if vch_type == "Payment": led1 = traced
                 else: led2 = traced
 
+            # Strict XML Formatting matching 'good one.xml'
             try: date_str = pd.to_datetime(row.get(date_col)).strftime("%Y%m%d")
             except: date_str = "20260101"
-            
-            clean_narration = narration_raw.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            clean_nar = nar_raw.replace("&", "&amp;").replace("<", "&lt;")
 
             xml_body += f"""<TALLYMESSAGE xmlns:UDF="TallyUDF">
                 <VOUCHER VCHTYPE="{vch_type}" ACTION="Create" OBJVIEW="Accounting Voucher View">
-                <DATE>{date_str}</DATE><NARRATION>{clean_narration}</NARRATION><VOUCHERTYPENAME>{vch_type}</VOUCHERTYPENAME>
+                <DATE>{date_str}</DATE><NARRATION>{clean_nar}</NARRATION><VOUCHERTYPENAME>{vch_type}</VOUCHERTYPENAME>
                 <ALLLEDGERENTRIES.LIST><LEDGERNAME>{led1}</LEDGERNAME><ISDEEMEDPOSITIVE>{led1_pos}</ISDEEMEDPOSITIVE><AMOUNT>{led1_amt}</AMOUNT></ALLLEDGERENTRIES.LIST>
                 <ALLLEDGERENTRIES.LIST><LEDGERNAME>{led2}</LEDGERNAME><ISDEEMEDPOSITIVE>{led2_pos}</ISDEEMEDPOSITIVE><AMOUNT>{led2_amt}</AMOUNT></ALLLEDGERENTRIES.LIST>
                 </VOUCHER></TALLYMESSAGE>"""
@@ -139,14 +136,18 @@ col1, col2 = st.columns([1, 1.5], gap="large")
 with col1:
     st.markdown("### 🛠️ 1. Settings & Mapping")
     master_file = st.file_uploader("Upload Tally Master (Optional)", type=['html'])
-    ledger_options = ["Suspense", "Cash", "Bank"]
+    
+    # THE DYNAMIC FIX: Options only appear if synced
     synced_masters = []
+    ledger_options = ["Please upload Master.html"] 
+    
     if master_file:
         synced_masters = extract_ledger_names(master_file)
         st.success(f"✅ Synced {len(synced_masters)} ledgers")
         ledger_options = ["⭐ AI Auto-Trace (Premium)"] + synced_masters
     
-    bank_led = st.selectbox("Select Bank Ledger", ["State Bank of India -38500202509"] + ledger_options)
+    # No hardcoded SBI here anymore!
+    bank_led = st.selectbox("Select Bank Ledger", ledger_options)
     party_led = st.selectbox("Select Default Party", ledger_options)
 
 with col2:
@@ -154,7 +155,6 @@ with col2:
     bank_file = st.file_uploader("Drop Statement here (Excel or PDF)", type=['xlsx', 'xls', 'pdf'])
     if bank_file:
         if st.button("🚀 Convert to Tally XML"):
-            # The smart loader identifies column names automatically
             df = load_data(bank_file)
             if df is not None:
                 xml_data = generate_tally_xml(df, bank_led, party_led, synced_masters)
@@ -164,11 +164,8 @@ with col2:
 
 # --- 5. BRANDED FOOTER ---
 s_logo = get_img_as_base64("logo 1.png")
-c_logo = get_img_as_base64("logo.png")
 s_html = f'<img src="data:image/png;base64,{s_logo}" width="25" style="vertical-align:middle; margin-right:5px;">' if s_logo else ""
-c_html = f'<img src="data:image/png;base64,{c_logo}" width="20" style="vertical-align:middle; margin-right:5px;">' if c_logo else ""
-
 st.markdown(f"""<div class="footer">
     <p>Sponsored By {s_html} <span class="brand-link" style="color:#0F172A;">Uday Mondal</span> | Consultant Advocate</p>
-    <p style="font-size: 13px;">{c_html} Powered & Created by <span class="brand-link">Debasish Biswas</span></p>
+    <p style="font-size: 13px;">Powered & Created by <span class="brand-link">Debasish Biswas</span></p>
 </div>""", unsafe_allow_html=True)
