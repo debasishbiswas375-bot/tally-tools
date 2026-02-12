@@ -48,7 +48,6 @@ def trace_ledger(text, master_list):
         if ledger.upper() in text_up: return ledger
     return "Suspense"
 
-# --- THE FIX: SMART LOADER FOR XLS, XLSX, AND PDF ---
 def load_data(file):
     fname = file.name.lower()
     try:
@@ -78,33 +77,33 @@ def generate_tally_xml(df, bank_led_sel, party_led_sel, master_list):
     xml_footer = """</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>"""
     xml_body = ""
     
-    # Auto-trace Actual Bank if Premium is selected for Bank Ledger
+    # Trace Bank Ledger from first row if Premium selected
     actual_bank = bank_led_sel
     if "⭐" in bank_led_sel and master_list:
-        actual_bank = trace_ledger(str(df.iloc[0]), master_list)
-        if actual_bank == "Suspense": actual_bank = "Bank" # Fallback for bank
-    
+        traced_bank = trace_ledger(str(df.iloc[0]), master_list)
+        actual_bank = traced_bank if traced_bank != "Suspense" else bank_led_sel.replace("⭐ AI Auto-Trace (Premium)", "").strip()
+
     for _, row in df.iterrows():
         try:
-            # Normalize column access
+            # Column Normalization
             debit = float(str(row.get('Debit', row.get('Withdrawal', 0))).replace(',', '')) if row.get('Debit') or row.get('Withdrawal') else 0
             credit = float(str(row.get('Credit', row.get('Deposit', 0))).replace(',', '')) if row.get('Credit') or row.get('Deposit') else 0
             narration_raw = str(row.get('Narration', row.get('Description', '')))
             
-            # Logic from 'good one.xml'
+            # Signage Logic from 'good one.xml'
             if debit > 0:
                 vch_type, amt = "Payment", debit
-                # Payment: Dr Suspense (Yes), Cr Bank (No)
+                # Dr Party (Yes), Cr Bank (No)
                 led1, led1_pos, led1_amt = (party_led_sel, "Yes", -amt)
                 led2, led2_pos, led2_amt = (actual_bank, "No", amt)
             elif credit > 0:
                 vch_type, amt = "Receipt", credit
-                # Receipt: Dr Bank (Yes), Cr Suspense (No)
+                # Dr Bank (Yes), Cr Party (No)
                 led1, led1_pos, led1_amt = (actual_bank, "Yes", -amt)
                 led2, led2_pos, led2_amt = (party_led_sel, "No", amt)
             else: continue
 
-            # AI Tracing: If match fails, trace_ledger returns 'Suspense'
+            # AI Tracing with Suspense Fallback
             if "⭐" in party_led_sel and master_list:
                 traced = trace_ledger(narration_raw, master_list)
                 if vch_type == "Payment": led1 = traced
@@ -147,7 +146,6 @@ with col1:
 
 with col2:
     st.markdown("### 📂 2. Upload & Convert")
-    # THE FIX: Added 'xls' to allowed types
     bank_file = st.file_uploader("Drop Statement here (Excel or PDF)", type=['xlsx', 'xls', 'pdf'])
     if bank_file:
         if st.button("🚀 Convert to Tally XML"):
@@ -159,7 +157,12 @@ with col2:
                 st.download_button("⬇️ Download Tally XML File", xml_data, "tally_import.xml", use_container_width=True)
 
 # --- 5. BRANDED FOOTER ---
+s_logo = get_img_as_base64("logo 1.png")
+c_logo = get_img_as_base64("logo.png")
+s_html = f'<img src="data:image/png;base64,{s_logo}" width="25" style="vertical-align:middle; margin-right:5px;">' if s_logo else ""
+c_html = f'<img src="data:image/png;base64,{c_logo}" width="20" style="vertical-align:middle; margin-right:5px;">' if c_logo else ""
+
 st.markdown(f"""<div class="footer">
-    <p>Sponsored By <span class="brand-link" style="color:#0F172A;">Uday Mondal</span> | Consultant Advocate</p>
-    <p style="font-size: 13px;">Powered & Created by <span class="brand-link">Debasish Biswas</span></p>
+    <p>Sponsored By {s_html} <span class="brand-link" style="color:#0F172A;">Uday Mondal</span> | Consultant Advocate</p>
+    <p style="font-size: 13px;">{c_html} Powered & Created by <span class="brand-link">Debasish Biswas</span></p>
 </div>""", unsafe_allow_html=True)
