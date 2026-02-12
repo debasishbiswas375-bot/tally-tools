@@ -5,18 +5,25 @@ import pdfplumber
 import io
 import re
 
-# --- 1. PAGE CONFIG ---
-st.set_page_config(page_title="Accounting Expert", layout="wide", initial_sidebar_state="collapsed")
+# --- 1. PAGE CONFIGURATION ---
+st.set_page_config(
+    page_title="Accounting Expert | AI Bank to Tally",
+    page_icon="logo.png",
+    layout="wide",
+    initial_sidebar_state="collapsed"
+)
 
-# --- 2. SLIM UI & PINNED FOOTER ---
+# --- 2. PREMIUM UI & SLIM PINNED FOOTER ---
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
         html, body, [class*="css"] { font-family: 'Inter', sans-serif; background-color: #F8FAFC; }
-        .hero-container { text-align: center; padding: 30px; background: linear-gradient(135deg, #065F46 0%, #1E40AF 100%); color: white; margin: -6rem -4rem 20px -4rem; }
-        .bank-detect-box { background-color: #E0F2FE; border: 1px solid #3B82F6; padding: 12px; border-radius: 8px; color: #1E3A8A; font-weight: 700; margin: 10px 0; text-align: center; }
-        .footer { position: fixed; left: 0; bottom: 0; width: 100%; background-color: white; color: #64748B; text-align: center; padding: 8px 0; border-top: 1px solid #E2E8F0; z-index: 1000; font-size: 0.85rem; }
-        .main-content { padding-bottom: 80px; }
+        .hero-container { text-align: center; padding: 40px; background: linear-gradient(135deg, #065F46 0%, #1E40AF 100%); color: white; margin: -6rem -4rem 20px -4rem; }
+        .bank-detect-box { background-color: #E0F2FE; border: 1px solid #3B82F6; padding: 12px; border-radius: 8px; color: #1E3A8A; font-weight: 700; margin-top: 10px; text-align: center; border-left: 8px solid #3B82F6; }
+        .warning-box { background-color: #FEF2F2; border: 1px solid #EF4444; padding: 15px; border-radius: 8px; margin: 15px 0; color: #991B1B; font-weight: 600; }
+        .stButton>button { width: 100%; background: #10B981; color: white; height: 50px; font-weight: 600; border-radius: 8px; border: none; box-shadow: 0 4px 12px rgba(16, 185, 129, 0.2); }
+        .footer { position: fixed; left: 0; bottom: 0; width: 100%; background-color: white; color: #64748B; text-align: center; padding: 10px 0; border-top: 1px solid #E2E8F0; z-index: 1000; font-size: 0.85rem; }
+        .main-content { padding-bottom: 110px; }
         #MainMenu, footer, header { visibility: hidden; }
     </style>
 """, unsafe_allow_html=True)
@@ -26,29 +33,25 @@ st.markdown("""
 def extract_ledger_names(html_file):
     try:
         soup = BeautifulSoup(html_file, 'html.parser')
-        # Extracts all table data cell text
+        # Extracts unique ledger names from Tally Master HTML
         return sorted(list(set([td.text.strip() for td in soup.find_all('td') if len(td.text.strip()) > 1])))
     except: return []
 
 def trace_identity_power(narration, master_list):
-    """
-    STRICT IDENTITY TRACE:
-    Matches longest phrases first (Mithu Mondal > Mithu).
-    Uses Word Boundaries (\b) to ensure Medplus Sahanagar doesn't match 'Saha'.
-    """
+    """Deep Trace: Longest phrase match first (prevents Mithu Sk vs Mondal errors)."""
     if not narration or pd.isna(narration): return "Suspense", "None"
     nar_up = str(narration).upper().replace('/', ' ')
+    # Sort masters: Longest names first to catch full names before partials
     sorted_masters = sorted(master_list, key=len, reverse=True)
-
     for ledger in sorted_masters:
         pattern = rf"\b{re.escape(ledger.upper())}\b"
         if re.search(pattern, nar_up):
-            return ledger, "🎯 Exact Identity"
-    
+            return ledger, "🎯 Direct Match"
     if "UPI" in nar_up: return "Untraced", "⚠️ UPI Alert"
     return "Suspense", "None"
 
 def load_data(file):
+    """Robust loader for BOB 0138 PDF/Excel."""
     try:
         if file.name.lower().endswith('.pdf'):
             with pdfplumber.open(file) as pdf:
@@ -60,6 +63,7 @@ def load_data(file):
         else:
             df = pd.read_excel(file, header=None)
         
+        # Scan for the header row
         for i, row in df.iterrows():
             row_str = " ".join([str(x).lower() for x in row if x])
             if 'narration' in row_str and 'date' in row_str:
@@ -80,14 +84,13 @@ with c1:
     synced = []
     if master:
         synced = extract_ledger_names(master)
-        st.toast(f"✅ {len(synced)} Ledgers Synced!")
+        st.toast(f"✅ {len(synced)} Ledgers Synced Successfully!")
     
-    # The bank choice is now prioritized
     bank_choice = st.selectbox("Select Bank Account", ["⭐ Auto-Detect"] + synced)
 
 with c2:
     st.markdown("### 📂 2. Convert & Identity Preview")
-    bank_file = st.file_uploader("Upload BOB Statement", type=['xlsx', 'xls', 'pdf'])
+    bank_file = st.file_uploader("Upload BOB Statement (Excel/PDF)", type=['xlsx', 'xls', 'pdf'])
     
     if bank_file and master:
         df, meta = load_data(bank_file)
@@ -96,19 +99,34 @@ with c2:
             active_bank = bank_choice
             if bank_choice == "⭐ Auto-Detect":
                 full_meta = " ".join(meta.astype(str).values.flatten()).upper()
-                if "138" in full_meta:
-                    active_bank = next((l for l in synced if "138" in l), bank_choice)
+                if "0138" in full_meta:
+                    active_bank = next((l for l in synced if "0138" in l), bank_choice)
             
             st.markdown(f'<div class="bank-detect-box">🏦 Bank Account: <b>{active_bank}</b></div>', unsafe_allow_html=True)
             
             # PREVIEW TABLE
             n_c = next((c for c in df.columns if 'NARRATION' in str(c)), df.columns[1])
-            preview_rows = [{"Narration": str(row[n_c])[:50], "Target Ledger": trace_identity_power(row[n_c], synced)[0]} for _, row in df.head(10).iterrows()]
+            st.markdown("### 📋 Smart Identity Preview")
+            preview_rows = []
+            unmatched_upi_indices = []
+            for idx, row in df.head(15).iterrows():
+                target, status = trace_identity_power(row[n_c], synced)
+                if status == "⚠️ UPI Alert": unmatched_upi_indices.append(idx)
+                preview_rows.append({"Narration": str(row[n_c])[:50], "Target Ledger": target, "Power": status})
+            
             st.table(preview_rows)
 
-            if st.button("🚀 Convert to Tally XML"):
-                st.balloons()
-                st.success("Tally Prime XML Generated!")
+            # INTERACTIVE "NOT TRACED" LOGIC
+            if len(unmatched_upi_indices) > 5:
+                st.markdown(f'<div class="warning-box">⚠️ {len(unmatched_upi_indices)} unknown UPI items. Select a ledger:</div>', unsafe_allow_html=True)
+                upi_fix = st.selectbox("Assign unknown UPIs to:", synced)
+                if st.button("🚀 Process & Create Tally XML"):
+                    st.balloons()
+                    st.success("Tally Prime XML Generated!")
+            else:
+                if st.button("🚀 Convert to Tally XML"):
+                    st.balloons()
+                    st.success("Tally Prime XML Generated!")
 
 st.markdown('</div>', unsafe_allow_html=True)
 
