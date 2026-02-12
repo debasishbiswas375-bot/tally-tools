@@ -61,33 +61,33 @@ def load_data(file):
         else:
             df = pd.read_excel(file)
         
-        # --- IMPROVED HEADER FINDER ---
         for i, row in df.iterrows():
             row_str = " ".join([str(x).lower() for x in row if x])
             if 'date' in row_str and ('narration' in row_str or 'description' in row_str or 'particulars' in row_str):
                 df.columns = df.iloc[i]
                 return df[i+1:].reset_index(drop=True)
-        return df # Fallback to raw data if no header found
+        return df
     except Exception as e:
         st.error(f"Error reading file: {e}")
         return None
 
-def generate_tally_xml(df, bank_led_sel, party_led_sel, master_list):
-    """Produces exact structure of 'good one.xml'."""
+def generate_tally_xml(df, bank_led_sel, party_led_sel, master_list, preview_mode=False):
+    """Produces structure matching 'good one.xml'."""
     xml_header = """<ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>Vouchers</REPORTNAME></REQUESTDESC><REQUESTDATA>"""
     xml_footer = """</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>"""
     xml_body = ""
     
-    # Identify dynamic columns
     cols = {str(c).lower().strip(): c for c in df.columns if c}
-    date_col = next((cols[k] for k in ['date', 'txn date', 'transaction date'] if k in cols), df.columns[0])
+    date_col = next((cols[k] for k in ['date', 'txn date', 'value date'] if k in cols), df.columns[0])
     desc_col = next((cols[k] for k in ['narration', 'description', 'particulars'] if k in cols), df.columns[1])
     debit_col = next((cols[k] for k in ['debit', 'withdrawal', 'dr'] if k in cols), None)
     credit_col = next((cols[k] for k in ['credit', 'deposit', 'cr'] if k in cols), None)
 
-    for _, row in df.iterrows():
+    # Process only 5 rows if preview_mode is True
+    rows_to_process = df.head(5) if preview_mode else df
+
+    for _, row in rows_to_process.iterrows():
         try:
-            # Logic from verified 'good one.xml'
             val_dr = float(str(row.get(debit_col, 0)).replace(',', '')) if debit_col and row.get(debit_col) else 0
             val_cr = float(str(row.get(credit_col, 0)).replace(',', '')) if credit_col and row.get(credit_col) else 0
             nar_raw = str(row.get(desc_col, ''))
@@ -102,20 +102,19 @@ def generate_tally_xml(df, bank_led_sel, party_led_sel, master_list):
                 led2, led2_pos, led2_amt = (party_led_sel, "No", amt)
             else: continue
 
-            # AI Auto-Trace logic
             if "⭐" in party_led_sel and master_list:
                 traced = trace_ledger(nar_raw, master_list)
                 if vch_type == "Payment": led1 = traced
                 else: led2 = traced
 
-            # Character cleaning for Tally
             clean_nar = nar_raw.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
             try: d_str = pd.to_datetime(row.get(date_col)).strftime("%Y%m%d")
             except: d_str = "20260101"
 
             xml_body += f"""<TALLYMESSAGE xmlns:UDF="TallyUDF"><VOUCHER VCHTYPE="{vch_type}" ACTION="Create" OBJVIEW="Accounting Voucher View"><DATE>{d_str}</DATE><NARRATION>{clean_nar}</NARRATION><VOUCHERTYPENAME>{vch_type}</VOUCHERTYPENAME><ALLLEDGERENTRIES.LIST><LEDGERNAME>{led1}</LEDGERNAME><ISDEEMEDPOSITIVE>{led1_pos}</ISDEEMEDPOSITIVE><AMOUNT>{led1_amt}</AMOUNT></ALLLEDGERENTRIES.LIST><ALLLEDGERENTRIES.LIST><LEDGERNAME>{led2}</LEDGERNAME><ISDEEMEDPOSITIVE>{led2_pos}</ISDEEMEDPOSITIVE><AMOUNT>{led2_amt}</AMOUNT></ALLLEDGERENTRIES.LIST></VOUCHER></TALLYMESSAGE>"""
         except: continue
-    return xml_header + xml_body + xml_footer
+    
+    return xml_body if preview_mode else xml_header + xml_body + xml_footer
 
 # --- 4. UI DASHBOARD ---
 
@@ -129,26 +128,43 @@ with c1:
     st.markdown("### 🛠️ 1. Settings & Mapping")
     master_file = st.file_uploader("Upload Tally Master (Optional)", type=['html'])
     synced_masters, ledger_options = [], ["Upload Master.html first"]
+    
     if master_file:
         synced_masters = extract_ledger_names(master_file)
         st.success(f"✅ Synced {len(synced_masters)} ledgers")
         ledger_options = ["⭐ AI Auto-Trace (Premium)"] + synced_masters
-    bank_led = st.selectbox("Select Bank Ledger", ["State Bank of India -38500202509"] + synced_masters)
+    
+    # Updated Bank Select: No hardcoded SBI. Defaults to Auto-Trace if synced.
+    bank_led = st.selectbox("Select Bank Ledger", ledger_options)
     party_led = st.selectbox("Select Default Party", ledger_options)
 
 with c2:
     st.markdown("### 📂 2. Upload & Convert")
     bank_file = st.file_uploader("Drop Statement here (Excel or PDF)", type=['xlsx', 'xls', 'pdf'])
+    
     if bank_file:
         df = load_data(bank_file)
         if df is not None:
-            st.markdown("##### 🔍 Data Preview")
-            st.dataframe(df.head(5), use_container_width=True) # Show raw data to confirm it's reading
+            st.markdown("🔍 **Data Preview**")
+            st.dataframe(df.head(5), use_container_width=True)
+            
+            # --- AUTO-SELECT BANK LOGIC ---
+            if "⭐" in bank_led and synced_masters:
+                # Scans first rows for bank keyword matching master list
+                auto_bank = trace_ledger(str(df.iloc[0:2]), synced_masters)
+                if auto_bank != "Suspense":
+                    st.info(f"💡 AI Detected Bank: **{auto_bank}**")
             
             if st.button("🚀 Convert to Tally XML"):
                 xml_data = generate_tally_xml(df, bank_led, party_led, synced_masters)
                 st.balloons()
                 st.success("Premium AI Match Complete!")
+                
+                # --- NEW GENERATED FILE PREVIEW ---
+                st.markdown("📄 **Generated XML Preview (First 5 Entries)**")
+                xml_preview = generate_tally_xml(df, bank_led, party_led, synced_masters, preview_mode=True)
+                st.code(xml_preview, language='xml')
+                
                 st.download_button("⬇️ Download Tally XML File", xml_data, "tally_import.xml", use_container_width=True)
 
 # --- 5. BRANDED FOOTER ---
