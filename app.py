@@ -41,15 +41,14 @@ def extract_ledger_names(html_file):
     except: return []
 
 def trace_ledger(text, master_list):
-    """Fuzzy matching: returns ledger if found in text, else 'Suspense'."""
     if not text or pd.isna(text): return "Suspense"
     text_up = str(text).upper()
     for ledger in master_list:
         if ledger.upper() in text_up: return ledger
     return "Suspense"
 
+# --- THE FIX: SMART LOADER WITH DUPLICATE COLUMN HANDLING ---
 def load_data(file):
-    """Detects headers dynamically to ensure data collection."""
     try:
         if file.name.lower().endswith('.pdf'):
             all_rows = []
@@ -61,32 +60,38 @@ def load_data(file):
         else:
             df = pd.read_excel(file)
         
+        # 1. Aggressive Header Finder
         for i, row in df.iterrows():
             row_str = " ".join([str(x).lower() for x in row if x])
-            if 'date' in row_str and ('narration' in row_str or 'description' in row_str or 'particulars' in row_str):
-                df.columns = df.iloc[i]
-                return df[i+1:].reset_index(drop=True)
-        return df
+            if 'date' in row_str and ('narration' in row_str or 'description' in row_str):
+                df.columns = [str(c).strip() if c else f"Col_{j}" for j, c in enumerate(df.iloc[i])]
+                df = df[i+1:].reset_index(drop=True)
+                break
+        
+        # 2. HANDLE DUPLICATE COLUMNS (Fixes the ValueError)
+        cols = pd.Series(df.columns)
+        for dup in cols[cols.duplicated()].unique(): 
+            cols[cols[cols == dup].index.values.tolist()] = [dup + '_' + str(i) if i != 0 else dup for i in range(sum(cols == dup))]
+        df.columns = cols
+        
+        return df.dropna(how='all', axis=0) # Remove empty rows
     except Exception as e:
-        st.error(f"Error reading file: {e}")
+        st.error(f"Critical Error: {e}")
         return None
 
-def generate_tally_xml(df, bank_led_sel, party_led_sel, master_list, preview_mode=False):
-    """Produces structure matching 'good one.xml'."""
+def generate_tally_xml(df, bank_led_sel, party_led_sel, master_list):
     xml_header = """<ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>Vouchers</REPORTNAME></REQUESTDESC><REQUESTDATA>"""
     xml_footer = """</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>"""
     xml_body = ""
     
-    cols = {str(c).lower().strip(): c for c in df.columns if c}
-    date_col = next((cols[k] for k in ['date', 'txn date', 'value date'] if k in cols), df.columns[0])
+    # Signage & Logic from verified 'good one.xml'
+    cols = {str(c).lower(): c for c in df.columns}
+    date_col = next((cols[k] for k in ['date', 'txn date', 'transaction date'] if k in cols), df.columns[0])
     desc_col = next((cols[k] for k in ['narration', 'description', 'particulars'] if k in cols), df.columns[1])
     debit_col = next((cols[k] for k in ['debit', 'withdrawal', 'dr'] if k in cols), None)
     credit_col = next((cols[k] for k in ['credit', 'deposit', 'cr'] if k in cols), None)
 
-    # Process only 5 rows if preview_mode is True
-    rows_to_process = df.head(5) if preview_mode else df
-
-    for _, row in rows_to_process.iterrows():
+    for _, row in df.iterrows():
         try:
             val_dr = float(str(row.get(debit_col, 0)).replace(',', '')) if debit_col and row.get(debit_col) else 0
             val_cr = float(str(row.get(credit_col, 0)).replace(',', '')) if credit_col and row.get(credit_col) else 0
@@ -97,7 +102,7 @@ def generate_tally_xml(df, bank_led_sel, party_led_sel, master_list, preview_mod
                 led1, led1_pos, led1_amt = (party_led_sel, "Yes", -amt)
                 led2, led2_pos, led2_amt = (bank_led_sel, "No", amt)
             elif val_cr > 0:
-                vch_type, amt = "Receipt", val_cr
+                vch_type, amt = "Receipt", credit
                 led1, led1_pos, led1_amt = (bank_led_sel, "Yes", -amt)
                 led2, led2_pos, led2_amt = (party_led_sel, "No", amt)
             else: continue
@@ -113,8 +118,7 @@ def generate_tally_xml(df, bank_led_sel, party_led_sel, master_list, preview_mod
 
             xml_body += f"""<TALLYMESSAGE xmlns:UDF="TallyUDF"><VOUCHER VCHTYPE="{vch_type}" ACTION="Create" OBJVIEW="Accounting Voucher View"><DATE>{d_str}</DATE><NARRATION>{clean_nar}</NARRATION><VOUCHERTYPENAME>{vch_type}</VOUCHERTYPENAME><ALLLEDGERENTRIES.LIST><LEDGERNAME>{led1}</LEDGERNAME><ISDEEMEDPOSITIVE>{led1_pos}</ISDEEMEDPOSITIVE><AMOUNT>{led1_amt}</AMOUNT></ALLLEDGERENTRIES.LIST><ALLLEDGERENTRIES.LIST><LEDGERNAME>{led2}</LEDGERNAME><ISDEEMEDPOSITIVE>{led2_pos}</ISDEEMEDPOSITIVE><AMOUNT>{led2_amt}</AMOUNT></ALLLEDGERENTRIES.LIST></VOUCHER></TALLYMESSAGE>"""
         except: continue
-    
-    return xml_body if preview_mode else xml_header + xml_body + xml_footer
+    return xml_header + xml_body + xml_footer
 
 # --- 4. UI DASHBOARD ---
 
@@ -128,43 +132,26 @@ with c1:
     st.markdown("### 🛠️ 1. Settings & Mapping")
     master_file = st.file_uploader("Upload Tally Master (Optional)", type=['html'])
     synced_masters, ledger_options = [], ["Upload Master.html first"]
-    
     if master_file:
         synced_masters = extract_ledger_names(master_file)
         st.success(f"✅ Synced {len(synced_masters)} ledgers")
         ledger_options = ["⭐ AI Auto-Trace (Premium)"] + synced_masters
-    
-    # Updated Bank Select: No hardcoded SBI. Defaults to Auto-Trace if synced.
-    bank_led = st.selectbox("Select Bank Ledger", ledger_options)
+    bank_led = st.selectbox("Select Bank Ledger", ["State Bank of India -38500202509"] + synced_masters)
     party_led = st.selectbox("Select Default Party", ledger_options)
 
 with c2:
     st.markdown("### 📂 2. Upload & Convert")
-    bank_file = st.file_uploader("Drop Statement here (Excel or PDF)", type=['xlsx', 'xls', 'pdf'])
-    
+    bank_file = st.file_uploader("Drop Statement here", type=['xlsx', 'xls', 'pdf'])
     if bank_file:
         df = load_data(bank_file)
         if df is not None:
             st.markdown("🔍 **Data Preview**")
             st.dataframe(df.head(5), use_container_width=True)
             
-            # --- AUTO-SELECT BANK LOGIC ---
-            if "⭐" in bank_led and synced_masters:
-                # Scans first rows for bank keyword matching master list
-                auto_bank = trace_ledger(str(df.iloc[0:2]), synced_masters)
-                if auto_bank != "Suspense":
-                    st.info(f"💡 AI Detected Bank: **{auto_bank}**")
-            
             if st.button("🚀 Convert to Tally XML"):
                 xml_data = generate_tally_xml(df, bank_led, party_led, synced_masters)
                 st.balloons()
                 st.success("Premium AI Match Complete!")
-                
-                # --- NEW GENERATED FILE PREVIEW ---
-                st.markdown("📄 **Generated XML Preview (First 5 Entries)**")
-                xml_preview = generate_tally_xml(df, bank_led, party_led, synced_masters, preview_mode=True)
-                st.code(xml_preview, language='xml')
-                
                 st.download_button("⬇️ Download Tally XML File", xml_data, "tally_import.xml", use_container_width=True)
 
 # --- 5. BRANDED FOOTER ---
