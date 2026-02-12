@@ -12,40 +12,57 @@ st.set_page_config(
     page_title="Accounting Expert | AI Bank to Tally", 
     page_icon="logo.png",
     layout="wide",
-    initial_sidebar_state="expanded" 
+    initial_sidebar_state="auto" # Changed to 'auto' to return to normal behavior
 )
 
-# --- 2. THEME & CSS ---
+# --- 2. UNIFIED CYBER-DARK THEME CSS ---
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
-        html, body, [class*="css"] { font-family: 'Inter', sans-serif; background-color: #F8FAFC; }
         
-        [data-testid="stSidebar"] { background-color: #0F172A !important; color: white !important; }
+        /* Set entire app to a solid deep navy color */
+        .stApp, [data-testid="stSidebar"], .main, .stSidebarContent, html, body {
+            background-color: #0F172A !important;
+            font-family: 'Inter', sans-serif;
+            color: #F8FAFC !important;
+        }
+
+        /* Sidebar Customization */
         [data-testid="stSidebar"] * { color: white !important; }
-        .sidebar-logo-text { font-size: 1.5rem; font-weight: 800; color: #10B981; margin-bottom: 20px; text-align: center; }
+        .sidebar-logo-text { font-size: 1.4rem; font-weight: 800; color: #10B981; text-align: center; margin-bottom: 20px; }
         .sidebar-footer-text { font-size: 12px; color: #94A3B8; text-align: center; margin-top: 30px; }
 
+        /* Hero Container (Original Gradient Style) */
         .hero-container {
-            text-align: center; padding: 50px 20px;
+            text-align: center; padding: 40px 20px;
             background: linear-gradient(135deg, #065F46 0%, #1E40AF 100%);
             color: white; margin: -6rem -4rem 30px -4rem;
-            box-shadow: 0 10px 30px -10px rgba(6, 95, 70, 0.5);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
         }
         
-        .stContainer { background-color: white; padding: 25px; border-radius: 16px; border: 1px solid #E2E8F0; margin-bottom: 20px; }
-        h3 { border-left: 5px solid #10B981; padding-left: 12px; font-weight: 700 !important; color: #1e293b !important; }
-
-        .stButton>button { 
-            width: 100%; background: linear-gradient(90deg, #10B981, #3B82F6); 
-            color: white; border-radius: 8px; height: 50px; font-weight: 700; border: none;
+        /* Card Styling (Solid Dark Tiles) */
+        .stContainer, div[data-testid="stVerticalBlock"] > div:has(div.stMarkdown) {
+            background-color: #1E293B !important;
+            padding: 25px; border-radius: 12px; 
+            border: 1px solid #334155;
+            margin-bottom: 20px;
         }
+
+        h1, h2, h3, p, span, label { color: white !important; }
+        h3 { border-left: 5px solid #10B981; padding-left: 12px; font-weight: 700 !important; }
+
+        /* Buttons */
+        .stButton>button { 
+            width: 100%; background: #10B981; 
+            color: white !important; border-radius: 8px; height: 50px; font-weight: 700; border: none;
+        }
+        .stButton>button:hover { background: #059669; }
         
         #MainMenu, footer, header {visibility: hidden;}
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. HELPER & LOGIC FUNCTIONS ---
+# --- 3. HELPER FUNCTIONS ---
 
 def get_img_as_base64(file):
     try:
@@ -53,7 +70,7 @@ def get_img_as_base64(file):
     except: return None
 
 def clean_currency(value):
-    if pd.isna(value) or value == '' or value is None: return 0.0
+    if pd.isna(value) or value == '': return 0.0
     val = re.sub(r'[^\d.]', '', str(value))
     try: return float(val)
     except: return 0.0
@@ -69,17 +86,13 @@ def trace_ledger(narration, master_ledgers):
     return None
 
 def smart_normalize(df):
-    """Refined header detection and row cleaning."""
+    """Deep Scanner to prevent empty columns and detection errors."""
     if df is None or df.empty: return pd.DataFrame()
-    
-    # Pre-clean: Remove completely empty rows and columns
-    df = df.dropna(how='all', axis=0).dropna(how='all', axis=1).reset_index(drop=True)
+    df = df.dropna(how='all').reset_index(drop=True)
     
     header_idx = None
     for i, row in df.iterrows():
-        # Clean row values for searching
-        clean_row = [str(v).lower().strip() for v in row.values if v is not None]
-        row_str = " ".join(clean_row)
+        row_str = " ".join([str(v).lower() for v in row.values if v is not None])
         if 'date' in row_str and ('narration' in row_str or 'particular' in row_str or 'desc' in row_str):
             header_idx = i
             break
@@ -91,72 +104,38 @@ def smart_normalize(df):
     df.columns = df.columns.astype(str).str.strip().str.lower()
     new_df = pd.DataFrame()
     col_map = {
-        'Date': ['date', 'txn', 'value', 'tran'],
-        'Narration': ['narration', 'particular', 'description', 'remarks', 'details'],
+        'Date': ['date', 'txn', 'value'],
+        'Narration': ['narration', 'particular', 'description'],
         'Debit': ['debit', 'withdrawal', 'out', 'dr'],
         'Credit': ['credit', 'deposit', 'in', 'cr']
     }
-    
     for target, aliases in col_map.items():
         found = next((c for c in df.columns if any(a in c for a in aliases)), None)
-        if found:
-            new_df[target] = df[found]
-        else:
-            new_df[target] = 0.0 if target in ['Debit', 'Credit'] else ""
-    
-    # Clean extracted data
-    new_df['Debit'] = new_df['Debit'].apply(clean_currency)
-    new_df['Credit'] = new_df['Credit'].apply(clean_currency)
-    new_df['Narration'] = new_df['Narration'].fillna('').astype(str)
-    
+        new_df[target] = df[found] if found else (0.0 if target in ['Debit', 'Credit'] else "")
     return new_df.dropna(subset=['Date'])
 
 def generate_tally_xml(df, bank_ledger):
-    """Strictly balanced XML generation."""
+    """Generates Tally-compliant XML with balanced entries."""
     xml_header = """<ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>Vouchers</REPORTNAME></REQUESTDESC><REQUESTDATA>"""
     xml_footer = """</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>"""
     body = ""
-    
     for _, row in df.iterrows():
         amt = row['Debit'] if row['Debit'] > 0 else row['Credit']
         if amt <= 0: continue
         vch_type = "Payment" if row['Debit'] > 0 else "Receipt"
-        
-        # Tally logic: Dr is positive, Cr is negative. We send -Amount to Tally tags
         l1, l1_amt = (row['Final Ledger'], amt) if vch_type == "Payment" else (bank_ledger, amt)
         l2, l2_amt = (bank_ledger, -amt) if vch_type == "Payment" else (row['Final Ledger'], -amt)
-
-        try: 
-            # Detect common Indian date formats
-            d = pd.to_datetime(row['Date'], dayfirst=True, errors='coerce').strftime("%Y%m%d")
+        try: d = pd.to_datetime(row['Date'], dayfirst=True).strftime("%Y%m%d") #
         except: d = "20260401"
-        
         nar = str(row['Narration']).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-        
-        body += f"""<TALLYMESSAGE xmlns:UDF="TallyUDF">
-         <VOUCHER VCHTYPE="{vch_type}" ACTION="Create">
-          <DATE>{d}</DATE>
-          <NARRATION>{nar}</NARRATION>
-          <VOUCHERTYPENAME>{vch_type}</VOUCHERTYPENAME>
-          <ALLLEDGERENTRIES.LIST>
-           <LEDGERNAME>{l1}</LEDGERNAME>
-           <ISDEEMEDPOSITIVE>{"Yes" if l1_amt > 0 else "No"}</ISDEEMEDPOSITIVE>
-           <AMOUNT>{-l1_amt}</AMOUNT>
-          </ALLLEDGERENTRIES.LIST>
-          <ALLLEDGERENTRIES.LIST>
-           <LEDGERNAME>{l2}</LEDGERNAME>
-           <ISDEEMEDPOSITIVE>{"Yes" if l2_amt > 0 else "No"}</ISDEEMEDPOSITIVE>
-           <AMOUNT>{-l2_amt}</AMOUNT>
-          </ALLLEDGERENTRIES.LIST>
-         </VOUCHER>
-        </TALLYMESSAGE>"""
+        body += f"""<TALLYMESSAGE><VOUCHER VCHTYPE="{vch_type}" ACTION="Create"><DATE>{d}</DATE><NARRATION>{nar}</NARRATION><ALLLEDGERENTRIES.LIST><LEDGERNAME>{l1}</LEDGERNAME><AMOUNT>{-l1_amt}</AMOUNT></ALLLEDGERENTRIES.LIST><ALLLEDGERENTRIES.LIST><LEDGERNAME>{l2}</LEDGERNAME><AMOUNT>{-l2_amt}</AMOUNT></ALLLEDGERENTRIES.LIST></VOUCHER></TALLYMESSAGE>"""
     return xml_header + body + xml_footer
 
 # --- 4. PERSISTENT SIDEBAR ---
 with st.sidebar:
     side_logo_b64 = get_img_as_base64("logo.png")
     if side_logo_b64:
-        st.markdown(f'<div style="text-align:center;"><img src="data:image/png;base64,{side_logo_b64}" width="100"></div>', unsafe_allow_html=True)
+        st.markdown(f'<div style="text-align:center;"><img src="data:image/png;base64,{side_logo_b64}" width="120"></div>', unsafe_allow_html=True)
     st.markdown('<div class="sidebar-logo-text">Accounting Expert</div>', unsafe_allow_html=True)
     
     with st.expander("👤 User Account", expanded=True):
@@ -169,7 +148,8 @@ with st.sidebar:
     with st.expander("❓ Help & Support"):
         st.write("WhatsApp: +91 9002043666")
 
-    st.markdown('<div style="height: 80px;"></div>', unsafe_allow_html=True)
+    # Sponsored Footer at bottom of Sidebar
+    st.markdown('<div style="height: 100px;"></div>', unsafe_allow_html=True)
     footer_logo_b64 = get_img_as_base64("logo 1.png")
     footer_logo_html = f'<img src="data:image/png;base64,{footer_logo_b64}" width="20" style="vertical-align: middle;">' if footer_logo_b64 else ""
     
@@ -182,7 +162,7 @@ with st.sidebar:
         </div>
     """, unsafe_allow_html=True)
 
-# --- 5. MAIN DASHBOARD AREA ---
+# --- 5. MAIN DASHBOARD ---
 hero_logo_b64 = get_img_as_base64("logo.png")
 hero_logo_html = f'<img src="data:image/png;base64,{hero_logo_b64}" width="100" style="margin-bottom:15px;">' if hero_logo_b64 else ""
 
@@ -215,7 +195,7 @@ with col_right:
         stmt_file = st.file_uploader("Upload PDF or Excel", type=['pdf', 'xlsx'])
         
         if stmt_file:
-            with st.status("🚀 AI Engine Processing...", expanded=True) as status:
+            with st.status("🚀 Processing with AI Engine...", expanded=False) as status:
                 if stmt_file.name.endswith('.pdf'):
                     with pdfplumber.open(stmt_file) as pdf:
                         data = []
@@ -229,22 +209,15 @@ with col_right:
                 df_clean = smart_normalize(df_raw)
                 
                 if not df_clean.empty and 'Date' in df_clean.columns:
-                    # AI Tracing Logic
                     df_clean['Final Ledger'] = df_clean['Narration'].apply(lambda x: trace_ledger(x, ledger_list) or part_led)
-                    
-                    status.update(label="✅ Analysis Complete!", state="complete")
-                    st.write("**Data Preview:**")
+                    status.update(label="✅ Ready!", state="complete")
+                    st.write("**Preview:**")
                     st.dataframe(df_clean[['Date', 'Narration', 'Final Ledger', 'Debit', 'Credit']].head(10), use_container_width=True)
                     
                     if st.button("🚀 GENERATE XML"):
-                        xml_output = generate_tally_xml(df_clean, bank_led)
+                        xml = generate_tally_xml(df_clean, bank_led)
                         st.balloons()
-                        st.download_button(
-                            label="⬇️ Download Tally XML",
-                            data=xml_output,
-                            file_name="tally_import.xml",
-                            mime="application/xml"
-                        )
+                        st.download_button("⬇️ Download XML", xml, "tally_import.xml")
                 else:
                     status.update(label="❌ Detection Failed", state="error")
                     st.error("I couldn't find the Date/Narration headers. Please check the PDF format.")
