@@ -48,7 +48,7 @@ def trace_ledger(text, master_list):
     return "Suspense"
 
 def load_data(file):
-    """Robust loader that handles duplicates and finds data headers."""
+    """FIX: Robust loader that renames duplicates to stop ValueError crash."""
     try:
         if file.name.lower().endswith('.pdf'):
             all_rows = []
@@ -59,12 +59,12 @@ def load_data(file):
             df = pd.DataFrame(all_rows)
         else:
             df = pd.read_excel(file)
-        
-        # 1. FIX: Rename Duplicate Columns (Fixes ValueError)
+
+        # RENAMING DUPLICATES (Fixes image_0bb480.png)
         cols = []
         count = {}
         for col in df.columns:
-            c_name = str(col) if not pd.isna(col) else "unnamed"
+            c_name = str(col).strip() if not pd.isna(col) else "unnamed"
             if c_name in count:
                 count[c_name] += 1
                 cols.append(f"{c_name}_{count[c_name]}")
@@ -73,31 +73,34 @@ def load_data(file):
                 cols.append(c_name)
         df.columns = cols
 
-        # 2. Header Finder
+        # Aggressive Header Finding
         for i, row in df.iterrows():
             row_str = " ".join([str(x).lower() for x in row if x])
             if 'date' in row_str and ('narration' in row_str or 'description' in row_str):
                 df.columns = [str(c).strip() for c in df.iloc[i]]
+                # Final rename for sanity
+                df.columns = pd.io.common.dedup_names(df.columns, is_unique=False)
                 return df[i+1:].reset_index(drop=True)
         return df
     except Exception as e:
         st.error(f"Critical Error: {e}")
         return None
 
-def generate_tally_xml(df, bank_led_sel, party_led_sel, master_list):
-    """Generates XML with verified signage from 'good one.xml'."""
+def generate_tally_xml(df, bank_led_sel, party_led_sel, master_list, is_preview=False):
+    """XML generator using signage from 'good one.xml'."""
     xml_header = """<ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>Vouchers</REPORTNAME></REQUESTDESC><REQUESTDATA>"""
     xml_footer = """</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>"""
     xml_body = ""
     
-    # Signage & Logic from verified sample
     cols = {str(c).lower().strip(): c for c in df.columns}
-    date_col = next((cols[k] for k in ['date', 'txn date', 'tran date'] if k in cols), df.columns[0])
+    date_col = next((cols[k] for k in ['date', 'txn date'] if k in cols), df.columns[0])
     desc_col = next((cols[k] for k in ['narration', 'description'] if k in cols), df.columns[1])
     debit_col = next((cols[k] for k in ['debit', 'withdrawal', 'dr'] if k in cols), None)
     credit_col = next((cols[k] for k in ['credit', 'deposit', 'cr'] if k in cols), None)
 
-    for _, row in df.iterrows():
+    process_rows = df.head(5) if is_preview else df
+
+    for _, row in process_rows.iterrows():
         try:
             val_dr = float(str(row.get(debit_col, 0)).replace(',', '')) if debit_col and row.get(debit_col) else 0
             val_cr = float(str(row.get(credit_col, 0)).replace(',', '')) if credit_col and row.get(credit_col) else 0
@@ -118,13 +121,13 @@ def generate_tally_xml(df, bank_led_sel, party_led_sel, master_list):
                 if vch_type == "Payment": led1 = traced
                 else: led2 = traced
 
-            clean_nar = nar_raw.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
+            clean_nar = nar_raw.replace("&", "&amp;").replace("<", "&lt;")
             try: d_str = pd.to_datetime(row.get(date_col)).strftime("%Y%m%d")
             except: d_str = "20260101"
 
             xml_body += f"""<TALLYMESSAGE xmlns:UDF="TallyUDF"><VOUCHER VCHTYPE="{vch_type}" ACTION="Create" OBJVIEW="Accounting Voucher View"><DATE>{d_str}</DATE><NARRATION>{clean_nar}</NARRATION><VOUCHERTYPENAME>{vch_type}</VOUCHERTYPENAME><ALLLEDGERENTRIES.LIST><LEDGERNAME>{led1}</LEDGERNAME><ISDEEMEDPOSITIVE>{led1_pos}</ISDEEMEDPOSITIVE><AMOUNT>{led1_amt}</AMOUNT></ALLLEDGERENTRIES.LIST><ALLLEDGERENTRIES.LIST><LEDGERNAME>{led2}</LEDGERNAME><ISDEEMEDPOSITIVE>{led2_pos}</ISDEEMEDPOSITIVE><AMOUNT>{led2_amt}</AMOUNT></ALLLEDGERENTRIES.LIST></VOUCHER></TALLYMESSAGE>"""
         except: continue
-    return xml_header + xml_body + xml_footer
+    return xml_body if is_preview else xml_header + xml_body + xml_footer
 
 # --- 4. UI DASHBOARD ---
 
@@ -156,20 +159,14 @@ with c2:
             st.dataframe(df.head(3), use_container_width=True)
             
             if st.button("🚀 Convert to Tally XML"):
-                # --- NEW LIVE ACCOUNTING PREVIEW ---
-                st.markdown("⚡ **AI Auto-Trace Preview (Tally Format)**")
-                # Identify column for trace
-                desc_c = next((c for c in df.columns if 'narration' in str(c).lower() or 'description' in str(c).lower()), df.columns[1])
-                
-                # Show first 5 matches
-                preview_data = []
-                for _, row in df.head(5).iterrows():
-                    traced = trace_ledger(row[desc_c], synced_masters) if synced_masters else "Suspense"
-                    preview_data.append({"Narration": str(row[desc_c])[:50]+"...", "Tally Party Ledger": traced})
-                
-                st.table(preview_data) # Clean table for matching verification
-                
+                # --- LIVE TALLY-STYLE PREVIEW ---
+                st.markdown("📈 **Tally-style Accounting Preview**")
                 xml_data = generate_tally_xml(df, bank_led, party_led, synced_masters)
+                
+                # Show first 5 matches in a code block for verification
+                preview_xml = generate_tally_xml(df, bank_led, party_led, synced_masters, is_preview=True)
+                st.code(preview_xml, language='xml')
+                
                 st.balloons()
                 st.success("Premium AI Match Complete!")
                 st.download_button("⬇️ Download Tally XML File", xml_data, "tally_import.xml", use_container_width=True)
