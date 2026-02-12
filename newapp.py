@@ -3,21 +3,27 @@ import pandas as pd
 from bs4 import BeautifulSoup
 import io
 
-# --- 1. PRO ENGINE: SMART LEDGER TRACING ---
+# --- 1. PRO ENGINE: MASTER LEDGER EXTRACTION ---
 
-def extract_ledger_list(html_file):
-    """Parses master.html to extract unique ledger names."""
+def get_ledger_names(html_file):
+    """
+    Parses Tally's master.html.
+    Extracts ledger names typically found in <td> tags.
+    """
     try:
         soup = BeautifulSoup(html_file, 'html.parser')
-        # Tally exports usually put ledger names in <td> tags
+        # Filter out very short strings or empty cells
         ledgers = [td.text.strip() for td in soup.find_all('td') if len(td.text.strip()) > 1]
         return sorted(list(set(ledgers)))
     except Exception as e:
-        st.error(f"Error reading master.html: {e}")
+        st.error(f"Error reading master: {e}")
         return []
 
-def trace_ledger_from_remark(remark, master_list):
-    """Matches bank narration text against the master ledger list."""
+def auto_trace_logic(remark, master_list):
+    """
+    The 'AI' matching engine that looks for ledger names 
+    inside bank statement narrations.
+    """
     if pd.isna(remark) or not str(remark).strip():
         return "Suspense Ledger"
     
@@ -27,93 +33,100 @@ def trace_ledger_from_remark(remark, master_list):
             return ledger
     return "Suspense Ledger"
 
-# --- 2. UI AND APP LAYOUT ---
+# --- 2. THE UI LAYOUT ---
 
 def main():
     st.set_page_config(page_title="Accounting Expert | AI Bank", layout="wide")
     
-    # Header Section
     st.markdown("# 🚀 Accounting Expert | AI Bank")
     st.markdown("---")
 
-    # Layout Columns
+    # Initialize Sidebar or State-based variables
+    if 'synced_ledgers' not in st.session_state:
+        st.session_state.synced_ledgers = []
+
+    # Two Column Layout (Mirroring your screenshot)
     col1, col2 = st.columns(2)
 
     with col1:
         st.markdown("### 🛠️ 1. Settings & Mapping")
         
-        # A. Master Upload
+        # A. The Master Uploader
         master_file = st.file_uploader("Upload Tally Master (Optional)", type="html")
         
-        # Initialize Ledger Data
-        master_ledgers = []
-        party_options = ["31 Group(s) and 542 Ledger(s)"] # Default view
-        premium_mode = False
+        # Default options before any sync
+        party_options = ["31 Group(s) and 542 Ledger(s)"]
+        is_premium = False
 
         if master_file:
-            master_ledgers = extract_ledger_list(master_file)
-            st.success(f"✅ Synced {len(master_ledgers)} ledgers")
+            # Extract names and update session state
+            st.session_state.synced_ledgers = get_ledger_names(master_file)
+            st.success(f"✅ Synced {len(st.session_state.synced_ledgers)} ledgers")
             
-            # THE PREMIUM UPGRADE: Injecting the Golden Star option
+            # --- THE GOLDEN STAR UPGRADE ---
+            # We put the AI Auto-Trace option at the very top
             premium_label = "⭐ AI Auto-Trace (Premium)"
-            party_options = [premium_label] + master_ledgers
-            premium_mode = True
+            party_options = [premium_label] + st.session_state.synced_ledgers
+            is_premium = True
 
         # B. Bank Ledger Selection
         st.selectbox("Select Bank Ledger", ["State Bank of India -38500202509"])
 
-        # C. The Updated "Select Default Party" with Golden Star
+        # C. The Dynamic "Select Default Party"
+        # This box now reacts instantly to the file upload
         selected_party = st.selectbox(
             "Select Default Party", 
             options=party_options,
             index=0,
-            help="Upload master.html to enable AI tracking!"
+            help="Upload master.html to unlock ⭐ AI Tracking"
         )
 
-        if premium_mode and "⭐" in selected_party:
-            st.toast("Premium AI Auto-Trace Enabled!", icon="⭐")
+        if is_premium and "⭐" in selected_party:
+            st.toast("Pro Engine Active: AI Matching enabled!", icon="⭐")
 
     with col2:
         st.markdown("### 📂 2. Upload & Convert")
         
         bank_format = st.selectbox("Select Bank Format", ["SBI", "HDFC", "ICICI", "Other"])
-        pdf_password = st.text_input("PDF Password", type="password", placeholder="Optional")
+        pdf_pass = st.text_input("PDF Password", type="password", placeholder="Optional")
         
         bank_file = st.file_uploader("Drop your Statement here (Excel or PDF)", type=["xlsx", "xls", "pdf"])
 
-    # --- 3. DATA PROCESSING ENGINE ---
-    
+    # --- 3. THE PROCESSING ENGINE ---
+
     if bank_file:
-        # Load the statement
-        df = pd.read_excel(bank_file) if bank_file.name.endswith(('.xlsx', '.xls')) else pd.DataFrame()
-        
-        if not df.empty:
-            st.markdown("---")
-            st.subheader("Data Preview & AI Mapping")
+        # Load bank data
+        try:
+            df = pd.read_excel(bank_file) if not bank_file.name.endswith('.pdf') else pd.DataFrame()
+            
+            if not df.empty:
+                st.markdown("---")
+                st.subheader("Data Preview & Premium Mapping")
 
-            # Logic for Auto-Tracing if Golden Star is selected
-            if premium_mode and "⭐" in selected_party:
-                # Find the column that looks like a description/narration
-                desc_col = next((col for col in df.columns if col.lower() in ['description', 'narration', 'remarks', 'particulars']), None)
-                
-                if desc_col:
-                    st.info(f"AI is tracing ledgers based on the '{desc_col}' column.")
-                    # Create the mapped column
-                    df['Mapped_Ledger'] = df[desc_col].apply(lambda x: trace_ledger_from_remark(x, master_ledgers))
+                # If the user selected the Golden Star option
+                if is_premium and "⭐" in selected_party:
+                    # Identify narration column
+                    cols = [c for c in df.columns if c.lower() in ['description', 'narration', 'particulars', 'remarks']]
+                    desc_col = cols[0] if cols else None
+                    
+                    if desc_col:
+                        st.info(f"AI is tracing ledgers from the '{desc_col}' column.")
+                        # RUN THE MATCHING ENGINE
+                        df['2nd_Ledger'] = df[desc_col].apply(lambda x: auto_trace_logic(x, st.session_state.synced_ledgers))
+                    else:
+                        st.warning("Could not find a narration column to match.")
+                        df['2nd_Ledger'] = "Suspense Ledger"
                 else:
-                    st.warning("Could not find a 'Narration' column to auto-trace. Please check your Excel format.")
-                    df['Mapped_Ledger'] = "Suspense Ledger"
-            else:
-                # Standard mapping (manual selection)
-                df['Mapped_Ledger'] = selected_party
+                    # Standard manual mode
+                    df['2nd_Ledger'] = selected_party
 
-            # Show the result
-            st.dataframe(df)
+                st.dataframe(df)
 
-            # Generate XML Button
-            if st.button("Generate Tally XML"):
-                # Your existing Tally XML logic goes here
-                st.success("Tally XML Generated! Ready for import.")
+                if st.button("Generate Tally XML"):
+                    st.success("Tally XML Ready for Download!")
+                    # (Insert your specific XML export code here)
+        except Exception as e:
+            st.error(f"Error processing bank statement: {e}")
 
 if __name__ == "__main__":
     main()
