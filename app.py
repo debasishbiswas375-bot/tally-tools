@@ -21,8 +21,27 @@ st.markdown("""
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
         html, body, [class*="css"] { font-family: 'Inter', sans-serif; background-color: #F8FAFC; }
         
-        [data-testid="stSidebar"] { background-color: #0F172A !important; color: white !important; }
-        [data-testid="stSidebar"] * { color: white !important; }
+        /* SIDEBAR STYLING */
+        [data-testid="stSidebar"] { 
+            background-color: #0F172A !important; 
+            color: white !important; 
+        }
+        
+        /* Fix sidebar text and expander visibility */
+        [data-testid="stSidebar"] .stText, 
+        [data-testid="stSidebar"] label, 
+        [data-testid="stSidebar"] .st-expander p,
+        [data-testid="stSidebar"] .st-expander span { 
+            color: white !important; 
+        }
+        
+        /* Style the expander border to make it visible */
+        [data-testid="stSidebar"] .st-expander {
+            border: 1px solid #334155 !important;
+            background-color: rgba(255, 255, 255, 0.05) !important;
+            border-radius: 8px !important;
+        }
+
         .sidebar-logo-text { font-size: 1.5rem; font-weight: 800; color: #10B981; margin-bottom: 20px; text-align: center; }
         
         /* MAXIMIZE BUTTON FIX */
@@ -77,14 +96,12 @@ def trace_ledger(narration, master_ledgers):
     return None
 
 def smart_normalize(df):
-    """FIXED: Uses list comprehension to safely handle None values and prevent AttributeError."""
     if df is None or df.empty: return pd.DataFrame()
     
     df = df.dropna(how='all', axis=0).reset_index(drop=True)
     
     header_idx = None
     for i, row in df.iterrows():
-        # CRITICAL FIX: Ensure no None values are passed to .lower()
         clean_row = [str(v).lower().strip() for v in row.values if v is not None]
         row_str = " ".join(clean_row)
         if 'date' in row_str and ('narration' in row_str or 'particular' in row_str or 'desc' in row_str):
@@ -113,7 +130,6 @@ def smart_normalize(df):
     return new_df.dropna(subset=['Date'])
 
 def generate_tally_xml(df, bank_ledger):
-    """FIXED: Ensures balanced entries to stop Tally import errors."""
     xml_header = """<ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>Vouchers</REPORTNAME></REQUESTDESC><REQUESTDATA>"""
     xml_footer = """</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>"""
     body = ""
@@ -123,11 +139,10 @@ def generate_tally_xml(df, bank_ledger):
         if amt <= 0: continue
         vch_type = "Payment" if row['Debit'] > 0 else "Receipt"
         
-        # Internal ledger logic
         l1, l1_amt = (row['Final Ledger'], amt) if vch_type == "Payment" else (bank_ledger, amt)
         l2, l2_amt = (bank_ledger, -amt) if vch_type == "Payment" else (row['Final Ledger'], -amt)
 
-        try: d = pd.to_datetime(row['Date'], dayfirst=True).strftime("%Y%m%d") #
+        try: d = pd.to_datetime(row['Date'], dayfirst=True).strftime("%Y%m%d")
         except: d = "20260401"
         
         nar = str(row['Narration']).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
@@ -148,7 +163,7 @@ def generate_tally_xml(df, bank_ledger):
         </TALLYMESSAGE>"""
     return xml_header + body + xml_footer
 
-# --- 4. PERSISTENT SIDEBAR ---
+# --- 4. SIDEBAR ---
 with st.sidebar:
     side_logo_b64 = get_img_as_base64("logo.png")
     if side_logo_b64:
