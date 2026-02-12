@@ -47,8 +47,8 @@ def trace_ledger(text, master_list):
         if ledger.upper() in text_up: return ledger
     return "Suspense"
 
-# --- THE FIX: SMART LOADER WITH DUPLICATE COLUMN HANDLING ---
 def load_data(file):
+    """Robust loader that handles duplicates and finds data headers."""
     try:
         if file.name.lower().endswith('.pdf'):
             all_rows = []
@@ -60,34 +60,40 @@ def load_data(file):
         else:
             df = pd.read_excel(file)
         
-        # 1. Aggressive Header Finder
+        # 1. FIX: Rename Duplicate Columns (Fixes ValueError)
+        cols = []
+        count = {}
+        for col in df.columns:
+            c_name = str(col) if not pd.isna(col) else "unnamed"
+            if c_name in count:
+                count[c_name] += 1
+                cols.append(f"{c_name}_{count[c_name]}")
+            else:
+                count[c_name] = 0
+                cols.append(c_name)
+        df.columns = cols
+
+        # 2. Header Finder
         for i, row in df.iterrows():
             row_str = " ".join([str(x).lower() for x in row if x])
             if 'date' in row_str and ('narration' in row_str or 'description' in row_str):
-                df.columns = [str(c).strip() if c else f"Col_{j}" for j, c in enumerate(df.iloc[i])]
-                df = df[i+1:].reset_index(drop=True)
-                break
-        
-        # 2. HANDLE DUPLICATE COLUMNS (Fixes the ValueError)
-        cols = pd.Series(df.columns)
-        for dup in cols[cols.duplicated()].unique(): 
-            cols[cols[cols == dup].index.values.tolist()] = [dup + '_' + str(i) if i != 0 else dup for i in range(sum(cols == dup))]
-        df.columns = cols
-        
-        return df.dropna(how='all', axis=0) # Remove empty rows
+                df.columns = [str(c).strip() for c in df.iloc[i]]
+                return df[i+1:].reset_index(drop=True)
+        return df
     except Exception as e:
         st.error(f"Critical Error: {e}")
         return None
 
 def generate_tally_xml(df, bank_led_sel, party_led_sel, master_list):
+    """Generates XML with verified signage from 'good one.xml'."""
     xml_header = """<ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>Vouchers</REPORTNAME></REQUESTDESC><REQUESTDATA>"""
     xml_footer = """</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>"""
     xml_body = ""
     
-    # Signage & Logic from verified 'good one.xml'
-    cols = {str(c).lower(): c for c in df.columns}
-    date_col = next((cols[k] for k in ['date', 'txn date', 'transaction date'] if k in cols), df.columns[0])
-    desc_col = next((cols[k] for k in ['narration', 'description', 'particulars'] if k in cols), df.columns[1])
+    # Signage & Logic from verified sample
+    cols = {str(c).lower().strip(): c for c in df.columns}
+    date_col = next((cols[k] for k in ['date', 'txn date', 'tran date'] if k in cols), df.columns[0])
+    desc_col = next((cols[k] for k in ['narration', 'description'] if k in cols), df.columns[1])
     debit_col = next((cols[k] for k in ['debit', 'withdrawal', 'dr'] if k in cols), None)
     credit_col = next((cols[k] for k in ['credit', 'deposit', 'cr'] if k in cols), None)
 
@@ -136,7 +142,8 @@ with c1:
         synced_masters = extract_ledger_names(master_file)
         st.success(f"✅ Synced {len(synced_masters)} ledgers")
         ledger_options = ["⭐ AI Auto-Trace (Premium)"] + synced_masters
-    bank_led = st.selectbox("Select Bank Ledger", ["State Bank of India -38500202509"] + synced_masters)
+    
+    bank_led = st.selectbox("Select Bank Ledger", ledger_options)
     party_led = st.selectbox("Select Default Party", ledger_options)
 
 with c2:
@@ -146,9 +153,22 @@ with c2:
         df = load_data(bank_file)
         if df is not None:
             st.markdown("🔍 **Data Preview**")
-            st.dataframe(df.head(5), use_container_width=True)
+            st.dataframe(df.head(3), use_container_width=True)
             
             if st.button("🚀 Convert to Tally XML"):
+                # --- NEW LIVE ACCOUNTING PREVIEW ---
+                st.markdown("⚡ **AI Auto-Trace Preview (Tally Format)**")
+                # Identify column for trace
+                desc_c = next((c for c in df.columns if 'narration' in str(c).lower() or 'description' in str(c).lower()), df.columns[1])
+                
+                # Show first 5 matches
+                preview_data = []
+                for _, row in df.head(5).iterrows():
+                    traced = trace_ledger(row[desc_c], synced_masters) if synced_masters else "Suspense"
+                    preview_data.append({"Narration": str(row[desc_c])[:50]+"...", "Tally Party Ledger": traced})
+                
+                st.table(preview_data) # Clean table for matching verification
+                
                 xml_data = generate_tally_xml(df, bank_led, party_led, synced_masters)
                 st.balloons()
                 st.success("Premium AI Match Complete!")
