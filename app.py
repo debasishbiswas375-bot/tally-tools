@@ -12,10 +12,10 @@ st.set_page_config(
     page_title="Accounting Expert | AI Bank to Tally", 
     page_icon="logo.png",
     layout="wide",
-    initial_sidebar_state="auto" 
+    initial_sidebar_state="collapsed" 
 )
 
-# --- 2. THEME & CSS (MOBILE EXPAND FIX) ---
+# --- 2. THEME & CSS (STYLISH FLOATING SIDEBAR BUTTON) ---
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700&display=swap');
@@ -31,12 +31,12 @@ st.markdown("""
             color: white !important;
         }
 
-        /* FIX EXPANDER STYLING */
+        /* FIX EXPANDER STYLING - Consistent Dark Theme */
         [data-testid="stSidebar"] .st-expander {
             background-color: rgba(255, 255, 255, 0.05) !important;
             border: 1px solid rgba(255, 255, 255, 0.1) !important;
-            border-radius: 10px !important;
-            margin-bottom: 10px !important;
+            border-radius: 12px !important;
+            margin-bottom: 15px !important;
         }
         
         [data-testid="stSidebar"] .st-expander summary {
@@ -54,27 +54,33 @@ st.markdown("""
             box-shadow: 0 10px 30px -10px rgba(6, 95, 70, 0.5);
         }
 
-        /* CRITICAL: SIDEBAR TOGGLE BUTTON FIX FOR MOBILE */
+        /* NEW STYLISH FLOATING BUTTON FOR SIDEBAR */
         [data-testid="stSidebarCollapsedControl"] {
-            background-color: #10B981 !important;
+            background: linear-gradient(135deg, #10B981 0%, #059669 100%) !important;
             color: white !important;
-            width: 55px !important;
-            height: 55px !important;
-            border-radius: 0 12px 12px 0 !important;
-            top: 15px !important;
-            left: 0 !important;
+            width: 50px !important;
+            height: 50px !important;
+            border-radius: 50% !important; /* Circle style */
+            top: 20px !important;
+            left: 15px !important;
             display: flex !important;
             align-items: center !important;
             justify-content: center !important;
-            box-shadow: 5px 5px 15px rgba(0,0,0,0.3) !important;
-            z-index: 999999 !important;
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.4) !important;
+            z-index: 9999999 !important;
+            border: 2px solid white !important;
+            transition: transform 0.3s ease !important;
+        }
+        
+        [data-testid="stSidebarCollapsedControl"]:hover {
+            transform: scale(1.1) !important;
         }
 
-        /* Ensure the arrow icon inside the toggle is white */
+        /* Ensure arrow icon is white and centered */
         [data-testid="stSidebarCollapsedControl"] svg {
             fill: white !important;
-            width: 30px !important;
-            height: 30px !important;
+            width: 25px !important;
+            height: 25px !important;
         }
 
         @media (max-width: 768px) {
@@ -90,9 +96,10 @@ st.markdown("""
             color: white; border-radius: 8px; height: 50px; font-weight: 700; border: none;
         }
         
-        /* Hide default Streamlit clutter but keep sidebar control visible */
-        header, footer {visibility: hidden;}
-        #MainMenu {visibility: hidden;}
+        /* Hide default Streamlit overlays */
+        header, footer {visibility: hidden !important;}
+        #MainMenu {visibility: hidden !important;}
+        .stDeployButton {display:none !important;}
     </style>
 """, unsafe_allow_html=True)
 
