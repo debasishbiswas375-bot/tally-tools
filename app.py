@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 from bs4 import BeautifulSoup
+import pdfplumber
 import io
 import base64
 import re
@@ -8,7 +9,7 @@ import re
 # --- 1. PAGE CONFIGURATION ---
 st.set_page_config(page_title="Accounting Expert", layout="wide", initial_sidebar_state="collapsed")
 
-# --- 2. PREMIUM UI & PINNED FOOTER ---
+# --- 2. UI & FOOTER CSS ---
 st.markdown("""
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
@@ -28,10 +29,15 @@ st.markdown("""
 def extract_ledger_names(html_file):
     try:
         soup = BeautifulSoup(html_file, 'html.parser')
-        return sorted(list(set([td.text.strip() for td in soup.find_all('td') if len(td.text.strip()) > 1])))
-    except: return []
+        raw_ledgers = list(set([td.text.strip() for td in soup.find_all('td') if len(td.text.strip()) > 1]))
+        # FILTER: Remove Banks/Cash from Party List to solve your "selecting all master" issue
+        party_ledgers = [l for l in raw_ledgers if not any(x in l.upper() for x in ["BANK", "CASH", "SBI", "BOB", "IFSC", "A/C"])]
+        bank_ledgers = [l for l in raw_ledgers if any(x in l.upper() for x in ["BANK", "SBI", "BOB"])]
+        return sorted(party_ledgers), sorted(bank_ledgers)
+    except: return [], []
 
 def trace_identity_power(narration, master_list):
+    """Deep Trace: Matches longest phrases (Mithu Mondal) and avoids partials (Saha)."""
     if not narration or pd.isna(narration): return "Suspense", "None"
     nar_up = str(narration).upper().replace('/', ' ')
     sorted_masters = sorted(master_list, key=len, reverse=True)
@@ -41,7 +47,7 @@ def trace_identity_power(narration, master_list):
     if "UPI" in nar_up: return "Untraced", "⚠️ UPI Alert"
     return "Suspense", "None"
 
-def generate_tally_xml(df, bank_led, synced, upi_fix_led=None):
+def generate_tally_xml(df, bank_led, synced_parties):
     xml_header = """<?xml version="1.0"?><ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>Vouchers</REPORTNAME></REQUESTDESC><REQUESTDATA>"""
     xml_footer = """</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>"""
     xml_body = ""
@@ -55,8 +61,7 @@ def generate_tally_xml(df, bank_led, synced, upi_fix_led=None):
             val_dr = float(str(row.get(dr_c, 0)).replace(',', '')) if dr_c and row.get(dr_c) else 0
             val_cr = float(str(row.get(cr_c, 0)).replace(',', '')) if cr_c and row.get(cr_c) else 0
             dt = pd.to_datetime(row.get(d_c)).strftime("%Y%m%d")
-            target, status = trace_identity_power(row[n_c], synced)
-            if status == "⚠️ UPI Alert" and upi_fix_led: target = upi_fix_led
+            target, _ = trace_identity_power(row[n_c], synced_parties)
             
             if val_dr > 0:
                 l1, l2, vch = (target, "Yes", -val_dr), (bank_led, "No", val_dr), "Payment"
@@ -70,7 +75,16 @@ def generate_tally_xml(df, bank_led, synced, upi_fix_led=None):
 
 def load_data(file):
     try:
-        df = pd.read_excel(file, header=None)
+        if file.name.lower().endswith('.pdf'):
+            with pdfplumber.open(file) as pdf:
+                all_text = []
+                for page in pdf.pages:
+                    table = page.extract_table()
+                    if table: all_text.extend(table)
+            df = pd.DataFrame(all_text)
+        else:
+            df = pd.read_excel(file, header=None)
+        
         for i, row in df.iterrows():
             row_str = " ".join([str(x).lower() for x in row if x])
             if 'narration' in row_str:
@@ -87,37 +101,33 @@ c1, c2 = st.columns([1, 1.5], gap="large")
 with c1:
     st.markdown("### 🛠️ 1. Settings")
     master = st.file_uploader("Upload Tally Master", type=['html'])
-    synced, options = [], ["Upload Master first"]
+    parties, banks = [], []
     if master:
-        synced = extract_ledger_names(master)
-        st.toast(f"✅ {len(synced)} Ledgers Synced Successfully!")
-        options = ["⭐ Auto-Select Bank"] + synced
-    bank_choice = st.selectbox("Select Bank Ledger", options)
+        parties, banks = extract_ledger_names(master)
+        st.toast(f"✅ {len(parties)} Parties & {len(banks)} Banks Synced!")
+    
+    bank_choice = st.selectbox("Select Bank Ledger", ["⭐ Auto-Select"] + banks)
 
 with c2:
     st.markdown("### 📂 2. Convert & Preview")
-    bank_file = st.file_uploader("Upload BOB Statement", type=['xlsx', 'xls'])
+    bank_file = st.file_uploader("Upload BOB Statement", type=['xlsx', 'xls', 'pdf'])
     if bank_file and master:
         df, meta = load_data(bank_file)
         if df is not None:
             active_bank = bank_choice
-            if bank_choice == "⭐ Auto-Select Bank":
+            if bank_choice == "⭐ Auto-Select":
                 full_txt = " ".join(meta.astype(str).values.flatten()).upper()
-                if any(k in full_txt for k in ["BOB", "138", "NASIM"]):
-                    active_bank = next((l for l in synced if any(k in l.upper() for k in ["BOB", "138"])), bank_choice)
-            st.markdown(f'<div class="bank-detect-box">🏦 Bank Selected: <b>{active_bank}</b></div>', unsafe_allow_html=True)
-            n_c = next((c for c in df.columns if 'NARRATION' in str(c)), df.columns[1])
-            unmatched = [idx for idx, r in df.iterrows() if trace_identity_power(r[n_c], synced)[1] == "⚠️ UPI Alert"]
+                active_bank = next((l for l in banks if any(k in full_txt or k in l.upper() for k in ["BOB", "138", "BARODA"])), "Bank of Baroda")
             
-            if len(unmatched) > 5:
-                st.markdown(f'<div class="warning-box">⚠️ {len(unmatched)} Untraced items.</div>', unsafe_allow_html=True)
-                upi_fix = st.selectbox("Assign Untraced to:", synced)
-                if st.button("🚀 Convert"):
-                    st.balloons()
-                    st.download_button("⬇️ Download", generate_tally_xml(df, active_bank, synced, upi_fix), file_name="tally.xml")
-            else:
-                if st.button("🚀 Convert"):
-                    st.balloons()
-                    st.download_button("⬇️ Download", generate_tally_xml(df, active_bank, synced), file_name="tally.xml")
+            st.markdown(f'<div class="bank-detect-box">🏦 Bank Ledger Selected: <b>{active_bank}</b></div>', unsafe_allow_html=True)
+            
+            n_c = next((c for c in df.columns if 'NARRATION' in str(c)), df.columns[1])
+            st.markdown("### 📋 Smart Identity Preview")
+            preview = [{"Narration": str(row[n_c])[:50], "Tally Target": trace_identity_power(row[n_c], parties)[0]} for _, row in df.head(10).iterrows()]
+            st.table(preview)
+
+            if st.button("🚀 Convert to Tally XML"):
+                st.balloons()
+                st.download_button("⬇️ Download", generate_tally_xml(df, active_bank, parties), file_name="tally.xml")
 
 st.markdown(f'<div class="footer">Sponsored By <b>Uday Mondal</b> | Created by <b>Debasish Biswas</b></div>', unsafe_allow_html=True)
