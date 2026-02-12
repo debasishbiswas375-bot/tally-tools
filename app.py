@@ -44,13 +44,18 @@ st.markdown("""
 
         .sidebar-logo-text { font-size: 1.5rem; font-weight: 800; color: #10B981; margin-bottom: 20px; text-align: center; }
         
-        /* MAXIMIZE BUTTON FIX */
+        /* MOBILE SIDEBAR BUTTON FIX - Making it very visible */
         [data-testid="stSidebarCollapsedControl"] {
-            background-color: #0F172A !important;
-            color: #10B981 !important;
-            border-radius: 0 8px 8px 0;
-            border: 1px solid #10B981;
-            top: 15px;
+            background-color: #10B981 !important; /* Bright Green */
+            color: white !important;
+            border-radius: 0 10px 10px 0;
+            top: 20px;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 2px 2px 10px rgba(0,0,0,0.2);
         }
 
         .hero-container {
@@ -97,9 +102,7 @@ def trace_ledger(narration, master_ledgers):
 
 def smart_normalize(df):
     if df is None or df.empty: return pd.DataFrame()
-    
     df = df.dropna(how='all', axis=0).reset_index(drop=True)
-    
     header_idx = None
     for i, row in df.iterrows():
         clean_row = [str(v).lower().strip() for v in row.values if v is not None]
@@ -107,11 +110,9 @@ def smart_normalize(df):
         if 'date' in row_str and ('narration' in row_str or 'particular' in row_str or 'desc' in row_str):
             header_idx = i
             break
-            
     if header_idx is not None:
         df.columns = df.iloc[header_idx]
         df = df[header_idx + 1:].reset_index(drop=True)
-    
     df.columns = df.columns.astype(str).str.strip().str.lower()
     new_df = pd.DataFrame()
     col_map = {
@@ -120,11 +121,9 @@ def smart_normalize(df):
         'Debit': ['debit', 'withdrawal', 'out', 'dr'],
         'Credit': ['credit', 'deposit', 'in', 'cr']
     }
-    
     for target, aliases in col_map.items():
         found = next((c for c in df.columns if any(a in c for a in aliases)), None)
         new_df[target] = df[found] if found else (0.0 if target in ['Debit', 'Credit'] else "")
-    
     new_df['Debit'] = new_df['Debit'].apply(clean_currency)
     new_df['Credit'] = new_df['Credit'].apply(clean_currency)
     return new_df.dropna(subset=['Date'])
@@ -133,20 +132,15 @@ def generate_tally_xml(df, bank_ledger):
     xml_header = """<ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>Vouchers</REPORTNAME></REQUESTDESC><REQUESTDATA>"""
     xml_footer = """</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>"""
     body = ""
-    
     for _, row in df.iterrows():
         amt = row['Debit'] if row['Debit'] > 0 else row['Credit']
         if amt <= 0: continue
         vch_type = "Payment" if row['Debit'] > 0 else "Receipt"
-        
         l1, l1_amt = (row['Final Ledger'], amt) if vch_type == "Payment" else (bank_ledger, amt)
         l2, l2_amt = (bank_ledger, -amt) if vch_type == "Payment" else (row['Final Ledger'], -amt)
-
         try: d = pd.to_datetime(row['Date'], dayfirst=True).strftime("%Y%m%d")
         except: d = "20260401"
-        
         nar = str(row['Narration']).replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
-        
         body += f"""<TALLYMESSAGE xmlns:UDF="TallyUDF">
          <VOUCHER VCHTYPE="{vch_type}" ACTION="Create">
           <DATE>{d}</DATE>
@@ -169,10 +163,8 @@ with st.sidebar:
     if side_logo_b64:
         st.markdown(f'<div style="text-align:center;"><img src="data:image/png;base64,{side_logo_b64}" width="100"></div>', unsafe_allow_html=True)
     st.markdown('<div class="sidebar-logo-text">Accounting Expert</div>', unsafe_allow_html=True)
-    
     with st.expander("👤 User Account", expanded=True):
         st.write("User: **Debasish**")
-    
     with st.expander("❓ Help & Support"):
         st.write("WhatsApp: +91 9002043666")
 
@@ -210,7 +202,6 @@ with col_right:
                     df_raw = pd.DataFrame(data)
                 else:
                     df_raw = pd.read_excel(stmt_file)
-
                 df_clean = smart_normalize(df_raw)
                 if not df_clean.empty and 'Date' in df_clean.columns:
                     df_clean['Final Ledger'] = df_clean['Narration'].apply(lambda x: trace_ledger(x, ledger_list) or part_led)
