@@ -5,160 +5,87 @@ import pdfplumber
 import io
 import base64
 import re
-import time
 
-# --- 1. PAGE CONFIGURATION ---
-st.set_page_config(
-    page_title="Accounting Expert | AI Bank to Tally",
-    page_icon="logo.png",
-    layout="wide",
-    initial_sidebar_state="collapsed"
-)
-
-# --- 2. IMAGE HANDLER ---
-def get_img_as_base64(file):
-    try:
-        with open(file, "rb") as f:
-            return base64.b64encode(f.read()).decode()
-    except: return None
-
-# --- 3. PREMIUM UI & LOADING CSS ---
+# --- 1. PAGE CONFIG & THEME ---
+st.set_page_config(page_title="Accounting Expert", layout="wide")
 st.markdown("""
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
-        html, body, [class*="css"] { font-family: 'Inter', sans-serif; background-color: #F8FAFC; }
-        .hero-container { text-align: center; padding: 50px 20px; background: linear-gradient(135deg, #065F46 0%, #1E40AF 100%); color: white; margin: -6rem -4rem 30px -4rem; }
-        .bank-detect-box { background-color: #E0F2FE; border: 1px solid #3B82F6; padding: 15px; border-radius: 12px; color: #1E3A8A; font-weight: 700; margin-bottom: 20px; text-align: center; border-left: 8px solid #3B82F6; }
-        .warning-box { background-color: #FEF2F2; border: 1px solid #EF4444; padding: 15px; border-radius: 10px; margin: 15px 0; color: #991B1B; font-weight: 600; border-left: 8px solid #EF4444; }
-        .stButton>button { width: 100%; background: #10B981; color: white; height: 55px; font-weight: 600; border-radius: 12px; border: none; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3); }
-        .footer { position: fixed; left: 0; bottom: 0; width: 100%; background-color: white; color: #64748B; text-align: center; padding: 12px 0; border-top: 1px solid #E2E8F0; z-index: 1000; font-size: 0.9rem; }
-        .main-content { padding-bottom: 120px; }
-        #MainMenu, footer, header { visibility: hidden; }
+        .stButton>button { width: 100%; background: #10B981; color: white; height: 50px; font-weight: 700; border-radius: 10px; }
+        .hero { text-align: center; padding: 40px; background: linear-gradient(135deg, #065F46 0%, #1E40AF 100%); color: white; margin: -6rem -4rem 2rem -4rem; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 4. CORE ENGINES (Optimized for BOB 0138 Auto-Detection) ---
+# --- 2. CORE ENGINES ---
+def extract_masters(html_file):
+    soup = BeautifulSoup(html_file, 'html.parser')
+    return sorted(list(set([td.text.strip() for td in soup.find_all('td') if len(td.text.strip()) > 1])), key=len, reverse=True)
 
-@st.cache_data
-def extract_ledger_names(html_file):
-    try:
-        soup = BeautifulSoup(html_file, 'html.parser')
-        # Filter for ledgers and sort by length to prevent partial matches like 'Saha' inside 'Sahanagar'
-        return sorted(list(set([td.text.strip() for td in soup.find_all('td') if len(td.text.strip()) > 1])), key=len, reverse=True)
-    except: return []
-
-def trace_identity_engine(narration, master_list):
-    if not narration or pd.isna(narration): return "Suspense", "None"
-    nar_up = str(narration).upper()
-    for ledger in master_list:
-        # Strict word boundary \b to separate names correctly
-        pattern = rf"\b{re.escape(ledger.upper())}\b"
-        if re.search(pattern, nar_up):
-            return ledger, "🎯 Match"
-    if any(k in nar_up for k in ["UPI", "VPA", "G-PAY"]): return "Untraced", "⚠️ UPI Alert"
-    return "Suspense", "None"
-
-def generate_tally_xml(df, bank_led, synced, upi_fix_led=None):
-    """STRICT VALIDATION ENGINE: Passes Tally Prime Import Checks"""
-    xml_header = '<?xml version="1.0" encoding="UTF-8"?><ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>Vouchers</REPORTNAME></REQUESTDESC><REQUESTDATA>'
-    xml_footer = '</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>'
-    xml_body = ""
+def generate_safe_xml(df, bank_led, masters, upi_fix="Suspense"):
+    # Header matching Final_Fixed_Import.xml structure
+    header = '<?xml version="1.0" encoding="UTF-8"?><ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>Vouchers</REPORTNAME><STATICVARIABLES><SVCURRENTCOMPANY/></STATICVARIABLES></REQUESTDESC><REQUESTDATA>'
+    footer = '</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>'
+    body = ""
     
-    # Fuzzy column detection
-    n_c = next((c for c in df.columns if any(k in str(c) for k in ['NARRATION', 'DESC', 'PARTICULARS'])), df.columns[1])
-    dr_c = next((c for c in df.columns if any(k in str(c) for k in ['WITHDRAWAL', 'DEBIT', 'DR'])), None)
-    cr_c = next((c for c in df.columns if any(k in str(c) for k in ['DEPOSIT', 'CREDIT', 'CR'])), None)
-    d_c = next((c for c in df.columns if 'DATE' in str(c)), df.columns[0])
+    # Identify Columns
+    cols = df.columns.tolist()
+    nar_idx = next((i for i, c in enumerate(cols) if 'NARRATION' in str(c).upper()), 1)
+    dr_idx = next((i for i, c in enumerate(cols) if any(x in str(c).upper() for x in ['WITHDRAWAL', 'DEBIT'])), None)
+    cr_idx = next((i for i, c in enumerate(cols) if any(x in str(c).upper() for x in ['DEPOSIT', 'CREDIT'])), None)
+    date_idx = 0
 
     for _, row in df.iterrows():
         try:
-            # Clean Narration for Tally XML safety
-            nar = str(row[n_c]).replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-            dt = pd.to_datetime(row[d_c]).strftime('%Y%m%d')
-            val_dr = float(str(row.get(dr_c, 0)).replace(',', '')) if dr_c and row[dr_c] else 0
-            val_cr = float(str(row.get(cr_c, 0)).replace(',', '')) if cr_c and row[cr_c] else 0
+            nar = str(row.iloc[nar_idx]).replace('&', '&amp;').replace('<', '&lt;')
+            dt = pd.to_datetime(row.iloc[date_idx]).strftime('%Y%m%d')
+            dr = float(str(row.iloc[dr_idx]).replace(',', '')) if dr_idx and pd.notna(row.iloc[dr_idx]) else 0
+            cr = float(str(row.iloc[cr_idx]).replace(',', '')) if cr_idx and pd.notna(row.iloc[cr_idx]) else 0
             
-            target, status = trace_identity_engine(nar, synced)
-            if status == "⚠️ UPI Alert" and upi_fix_led: target = upi_fix_led
-            
-            if val_dr > 0: # Payment entry
-                xml_body += f"""<TALLYMESSAGE xmlns:UDF="TallyUDF"><VOUCHER VCHTYPE="Payment" ACTION="Create"><DATE>{dt}</DATE><NARRATION>{nar}</NARRATION><VOUCHERTYPENAME>Payment</VOUCHERTYPENAME><ALLLEDGERENTRIES.LIST><LEDGERNAME>{target}</LEDGERNAME><ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE><AMOUNT>-{val_dr}</AMOUNT></ALLLEDGERENTRIES.LIST><ALLLEDGERENTRIES.LIST><LEDGERNAME>{bank_led}</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>{val_dr}</AMOUNT></ALLLEDGERENTRIES.LIST></VOUCHER></TALLYMESSAGE>"""
-            elif val_cr > 0: # Receipt entry
-                xml_body += f"""<TALLYMESSAGE xmlns:UDF="TallyUDF"><VOUCHER VCHTYPE="Receipt" ACTION="Create"><DATE>{dt}</DATE><NARRATION>{nar}</NARRATION><VOUCHERTYPENAME>Receipt</VOUCHERTYPENAME><ALLLEDGERENTRIES.LIST><LEDGERNAME>{bank_led}</LEDGERNAME><ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE><AMOUNT>-{val_cr}</AMOUNT></ALLLEDGERENTRIES.LIST><ALLLEDGERENTRIES.LIST><LEDGERNAME>{target}</LEDGERNAME><ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE><AMOUNT>{val_cr}</AMOUNT></ALLLEDGERENTRIES.LIST></VOUCHER></TALLYMESSAGE>"""
+            # Identity Trace
+            target = "Suspense"
+            for m in masters:
+                if re.search(rf"\b{re.escape(m.upper())}\b", nar.upper()):
+                    target = m
+                    break
+            if target == "Suspense" and "UPI" in nar.upper(): target = upi_fix
+
+            if dr > 0 or cr > 0:
+                vtype = "Payment" if dr > 0 else "Receipt"
+                amt = dr if dr > 0 else cr
+                # Debit/Credit Logic for Tally
+                l1, l1_amt = (target, -amt) if dr > 0 else (bank_led, -amt)
+                l2, l2_amt = (bank_led, amt) if dr > 0 else (target, amt)
+                
+                body += f'<TALLYMESSAGE xmlns:UDF="TallyUDF"><VOUCHER VCHTYPE="{vtype}" ACTION="Create"><DATE>{dt}</DATE><NARRATION>{nar}</NARRATION><VOUCHERTYPENAME>{vtype}</VOUCHERTYPENAME><ALLLEDGERENTRIES.LIST><LEDGERNAME>{l1}</LEDGERNAME><ISDEEMEDPOSITIVE>{"Yes" if l1_amt < 0 else "No"}</ISDEEMEDPOSITIVE><AMOUNT>{l1_amt}</AMOUNT></ALLLEDGERENTRIES.LIST><ALLLEDGERENTRIES.LIST><LEDGERNAME>{l2}</LEDGERNAME><ISDEEMEDPOSITIVE>{"Yes" if l2_amt < 0 else "No"}</ISDEEMEDPOSITIVE><AMOUNT>{l2_amt}</AMOUNT></ALLLEDGERENTRIES.LIST></VOUCHER></TALLYMESSAGE>'
         except: continue
-    return xml_header + xml_body + xml_footer
+    return header + body + footer
 
-def load_data(file):
-    """Improved Loader: Snippets top rows for Account Sniffing"""
-    try:
-        if file.name.lower().endswith('.pdf'):
-            with pdfplumber.open(file) as pdf:
-                all_data = [row for page in pdf.pages for row in (page.extract_table() or [])]
-            df = pd.DataFrame(all_data)
-        else:
-            df = pd.read_excel(file, header=None)
+# --- 3. UI ---
+st.markdown('<div class="hero"><h1>Accounting Expert</h1></div>', unsafe_allow_html=True)
+
+col1, col2 = st.columns(2)
+with col1:
+    m_file = st.file_uploader("Upload Master.html", type=['html'])
+    masters = extract_masters(m_file) if m_file else []
+    bank_led = st.selectbox("Select Bank Account", ["⭐ Auto-Detect"] + masters)
+
+with col2:
+    s_file = st.file_uploader("Upload Statement", type=['xlsx', 'xls', 'pdf'])
+    if s_file and m_file:
+        df = pd.read_excel(s_file) if not s_file.name.endswith('.pdf') else pd.DataFrame() # Simplified for Excel
         
-        for i, row in df.iterrows():
-            row_str = " ".join([str(x).lower() for x in row if x])
-            if 'narration' in row_str or 'date' in row_str:
-                df.columns = [str(c).strip().upper() for c in df.iloc[i]]
-                return df[i+1:].reset_index(drop=True).dropna(subset=[df.columns[1]], thresh=1), df.iloc[:i]
-        return None, None
-    except: return None, None
-
-# --- 5. UI IMPLEMENTATION ---
-l_primary = get_img_as_base64("logo.png")
-l_html = f'<img src="data:image/png;base64,{l_primary}" width="80" style="margin-bottom:10px;">' if l_primary else ""
-st.markdown(f'<div class="hero-container">{l_html}<h1>Accounting Expert</h1><p>BOB 0138 Auto-Detect & Import-Safe Engine</p></div>', unsafe_allow_html=True)
-
-st.markdown('<div class="main-content">', unsafe_allow_html=True)
-c1, c2 = st.columns([1, 1.5], gap="large")
-
-with c1:
-    st.markdown("### 🛠️ 1. Settings")
-    master = st.file_uploader("Upload Master.html", type=['html'])
-    synced = extract_ledger_names(master) if master else []
-    if synced: st.toast(f"✅ {len(synced)} Ledgers Synced!")
-    bank_choice = st.selectbox("Select Bank Account", ["⭐ Auto-Detect"] + synced)
-
-with c2:
-    st.markdown("### 📂 2. Convert & Download")
-    bank_file = st.file_uploader("Upload Statement", type=['xlsx', 'xls', 'pdf'])
-    
-    if bank_file and master:
-        df, meta = load_data(bank_file)
-        if df is not None:
-            # ACCOUNT SNIFFER: Automatically detects '0138' from statement header
-            active_bank = bank_choice
-            if bank_choice == "⭐ Auto-Detect":
-                full_meta = " ".join(meta.astype(str).values.flatten()).upper()
-                if "0138" in full_meta:
-                    active_bank = next((l for l in synced if "0138" in l), bank_choice)
-            
-            st.markdown(f'<div class="bank-detect-box">🏦 Auto-Detected: <b>{active_bank}</b></div>', unsafe_allow_html=True)
-            
-            n_c = next((c for c in df.columns if any(k in str(c) for k in ['NARRATION', 'DESC'])), df.columns[1])
-            unmatched = [idx for idx, r in df.iterrows() if trace_identity_engine(r[n_c], synced)[1] == "⚠️ UPI Alert"]
-            
-            st.write("**Identity Preview:**")
-            st.table([{"Narration": str(row[n_c])[:50], "Target": trace_identity_engine(row[n_c], synced)[0]} for _, row in df.head(5).iterrows()])
-
-            if len(unmatched) > 5:
-                st.markdown(f'<div class="warning-box">⚠️ Found {len(unmatched)} Untraced Items!</div>', unsafe_allow_html=True)
-                upi_fix = st.selectbox("Assign Untraced to:", synced)
-                if st.button("🚀 Process & Generate Tally XML"):
-                    with st.status("🛠️ Optimizing for Tally Prime..."):
-                        xml = generate_tally_xml(df, active_bank, synced, upi_fix)
-                    st.download_button("⬇️ Download tally_import.xml", xml, "tally_import.xml", "application/xml")
+        # --- AUTO-DETECT BANK ACCOUNT ---
+        # Scans the top of your Excel file for '0138'
+        if bank_led == "⭐ Auto-Detect":
+            statement_text = str(df.iloc[:5].values).upper()
+            if "0138" in statement_text:
+                bank_led = next((m for m in masters if "0138" in m), "Suspense")
+        
+        st.info(f"🏦 Working with: {bank_led}")
+        
+        if st.button("🚀 Process & Generate Tally XML"):
+            xml_data = generate_safe_xml(df, bank_led, masters)
+            if len(xml_data) < 500: # Check if file is empty
+                st.error("❌ No data found in statement! Check your column names.")
             else:
-                if st.button("🚀 Convert to Tally XML"):
-                    with st.status("🚀 Converting..."):
-                        xml = generate_tally_xml(df, active_bank, synced)
-                    st.download_button("⬇️ Download tally_import.xml", xml, "tally_import.xml", "application/xml")
-
-st.markdown('</div>', unsafe_allow_html=True)
-
-# Footer
-l_foot = get_img_as_base64("logo 1.png")
-f_html = f'<img src="data:image/png;base64,{l_foot}" width="25" style="vertical-align: middle;">' if l_foot else ""
-st.markdown(f'<div class="footer">{f_html} Sponsored By <b>Uday Mondal</b> | Created by <b>Debasish Biswas</b></div>', unsafe_allow_html=True)
+                st.success("✅ Conversion Complete!")
+                st.download_button("⬇️ Download tally_import.xml", xml_data, "tally_import.xml", "application/xml")
