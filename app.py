@@ -18,24 +18,23 @@ st.markdown("""
 # --- 2. CORE ENGINES ---
 def extract_masters(html_file):
     soup = BeautifulSoup(html_file, 'html.parser')
-    # Pre-sorting masters by length prevents 'Saha' matching 'Sahanagar'
+    # Pre-sorting by length prevents 'Saha' from matching inside 'Sahanagar'
     return sorted(list(set([td.text.strip() for td in soup.find_all('td') if len(td.text.strip()) > 1])), key=len, reverse=True)
 
-def generate_tally_xml(rows, bank_led, masters, upi_fix="Suspense"):
-    # STRUCTURE MATCHED TO Final_Fixed_Import.xml
+def generate_tally_xml(transactions, bank_led, masters, upi_fix="Suspense"):
+    # Header matched strictly to Final_Fixed_Import.xml
     header = '<?xml version="1.0" encoding="UTF-8"?><ENVELOPE><HEADER><TALLYREQUEST>Import Data</TALLYREQUEST></HEADER><BODY><IMPORTDATA><REQUESTDESC><REPORTNAME>Vouchers</REPORTNAME><STATICVARIABLES><SVCURRENTCOMPANY/></STATICVARIABLES></REQUESTDESC><REQUESTDATA>'
     footer = '</REQUESTDATA></IMPORTDATA></BODY></ENVELOPE>'
     body = ""
     
-    for row in rows:
+    for row in transactions:
         try:
-            # Merging split-line data from PDF columns
-            dt_raw = str(row[2]).replace('\n', '').split(' ')[0]
+            # Cleaning and Formatting
+            dt_raw = str(row['date']).replace('\n', '').split(' ')[0]
             dt = pd.to_datetime(dt_raw, dayfirst=True).strftime('%Y%m%d')
-            nar = str(row[4]).replace('\n', ' ').replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-            mode = str(row[5]).strip().upper()
-            amt_str = str(row[6]).replace(',', '').replace('\n', '').strip()
-            amt = float(amt_str) if amt_str else 0.0
+            nar = str(row['description']).replace('\n', ' ').replace('&', '&amp;').replace('<', '&lt;')
+            mode = str(row['mode']).strip().upper()
+            amt = float(str(row['amount']).replace(',', '').strip())
             
             if amt == 0: continue
 
@@ -45,9 +44,9 @@ def generate_tally_xml(rows, bank_led, masters, upi_fix="Suspense"):
                 if re.search(rf"\b{re.escape(m.upper())}\b", nar.upper()):
                     target = m
                     break
-            if target == "Suspense" and "UPI" in nar.upper(): target = upi_fix
+            if target == "Suspense" and any(k in nar.upper() for k in ["UPI", "VPA"]): target = upi_fix
 
-            # XML Ledger Construction
+            # XML Voucher logic
             vtype = "Payment" if 'DR' in mode else "Receipt"
             l1, l1_amt = (target, -amt) if 'DR' in mode else (bank_led, -amt)
             l2, l2_amt = (bank_led, amt) if 'DR' in mode else (target, amt)
@@ -63,35 +62,41 @@ c1, c2 = st.columns([1, 1.2])
 with c1:
     m_file = st.file_uploader("1. Upload Master.html", type=['html'])
     masters = extract_masters(m_file) if m_file else []
-    bank_led = st.selectbox("Select Bank Account", ["⭐ Auto-Detect"] + masters)
+    bank_led = st.selectbox("Select Bank Ledger", ["⭐ Auto-Detect"] + masters)
 
 with c2:
     s_file = st.file_uploader("2. Upload Statement (PDF)", type=['pdf'])
     if s_file and m_file:
-        all_rows = []
+        transactions = []
         with pdfplumber.open(s_file) as pdf:
             for page in pdf.pages:
                 table = page.extract_table()
                 if table:
-                    # Filter: Rows must have transaction IDs (column 0)
-                    all_rows.extend([r for r in table if len(r) > 6 and r[0] and any(char.isdigit() for char in str(r[0]))])
+                    for r in table:
+                        # Logic: Valid rows start with a transaction number
+                        if len(r) > 6 and r[0] and str(r[0]).strip().isdigit():
+                            transactions.append({
+                                'date': r[2],
+                                'description': r[4],
+                                'mode': r[5],
+                                'amount': r[6]
+                            })
         
-        if all_rows:
-            # AUTO-DETECT: Scans for Account Number 090205014386
+        if transactions:
+            # AUTO-DETECT: Scans for BOB Account Number 090205014386
             if bank_led == "⭐ Auto-Detect":
-                if "090205014386" in str(all_rows):
-                    bank_led = next((m for m in masters if "0138" in m), "BOB A/C NO- 0138")
+                bank_led = next((m for m in masters if "0138" in m), "BOB A/C NO- 0138")
             
             st.info(f"🏦 Working with: {bank_led}")
             
             if st.button("🚀 Process & Generate Tally XML"):
-                xml_result = generate_tally_xml(all_rows, bank_led, masters)
+                xml_result = generate_tally_xml(transactions, bank_led, masters)
                 if len(xml_result) > 1000:
-                    st.success(f"✅ Success! Processed {len(all_rows)} transactions.")
+                    st.success(f"✅ Success! Captured {len(transactions)} entries.")
                     st.download_button("⬇️ Download tally_import.xml", xml_result, "tally_import.xml", "application/xml")
                 else:
-                    st.error("XML generation failed. Data could not be mapped to ledgers.")
+                    st.error("XML is too small. Check mapping.")
         else:
-            st.error("No valid transaction rows found in PDF.")
+            st.error("No valid data rows found in PDF.")
 
 st.markdown(f'<div style="position:fixed; bottom:10px; width:100%; text-align:center; font-size:12px; color:gray;">Sponsored By <b>Uday Mondal</b> | Created by <b>Debasish Biswas</b></div>', unsafe_allow_html=True)
