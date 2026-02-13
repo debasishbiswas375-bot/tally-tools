@@ -1,136 +1,75 @@
 import streamlit as st
 import pandas as pd
-from bs4 import BeautifulSoup
-import pdfplumber
 import re
-import base64
 
 # --- 1. PAGE CONFIG ---
 st.set_page_config(
     page_title="Accounting Expert", 
     page_icon="logo.png",
     layout="wide",
-    initial_sidebar_state="collapsed" # Starts closed like a mobile app
+    initial_sidebar_state="collapsed" 
 )
 
-# --- 2. THE "IRONCLAD" UI ENGINE ---
+# --- 2. THE UI ENGINE (CSS) ---
 st.markdown("""
     <style>
-        /* Hide default Streamlit elements */
-        header, .stDeployButton { visibility: hidden !important; display: none !important; }
+        .main .block-container { padding-top: 6.5rem !important; }
+        header, .stDeployButton, footer { visibility: hidden !important; display: none !important; }
         
-        /* 🟢 THE 3-LINE HAMBURGER MENU (To Expand) */
+        /* Hamburger Menu */
         [data-testid="stSidebarCollapsedControl"] {
             background-color: #10B981 !important;
             border-radius: 8px !important;
-            width: 45px !important;
-            height: 45px !important;
-            top: 15px !important;
-            left: 15px !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-            z-index: 999999 !important;
-            border: 1px solid rgba(255,255,255,0.2) !important;
+            width: 46px !important; height: 46px !important;
+            top: 12px !important; left: 12px !important;
+            display: flex !important; align-items: center; justify-content: center !important;
+            z-index: 1000000 !important;
         }
-
-        /* Hide the default Streamlit >> arrow */
         [data-testid="stSidebarCollapsedControl"] svg { display: none !important; }
-
-        /* Draw the 3 lines using CSS */
         [data-testid="stSidebarCollapsedControl"]::before {
-            content: "";
-            width: 20px;
-            height: 2px;
-            background: white;
-            position: absolute;
-            box-shadow: 0 7px 0 white, 0 -7px 0 white;
+            content: ""; width: 22px; height: 2px; background: white;
+            position: absolute; box-shadow: 0 7px 0 white, 0 -7px 0 white;
         }
 
-        /* ❌ THE "X" CLOSE BUTTON (Inside Sidebar) */
-        /* This targets the Streamlit collapse button when the sidebar is open */
-        [data-testid="stSidebar"] button[kind="headerNoSpacing"] {
-            background-color: #10B981 !important;
-            color: white !important;
-            border-radius: 50% !important;
-            top: 10px !important;
-            right: 10px !important;
-        }
-
-        /* 👤 TOP RIGHT PROFILE */
-        .user-mgmt-container {
-            position: fixed; 
-            top: 15px; 
-            right: 15px; 
-            z-index: 999999; 
-            display: flex; 
-            align-items: center;
-        }
-        .profile-pic {
-            width: 45px; 
-            height: 45px; 
-            border-radius: 50%;
-            border: 2px solid #10B981; 
-            background-color: white;
-        }
-
-        /* SIDEBAR STYLING */
-        [data-testid="stSidebar"] {
-            background-color: #0F172A !important;
-            border-right: 2px solid #10B981;
-        }
-        [data-testid="stSidebar"] * { color: white !important; }
-
-        /* HERO SECTION */
+        /* Hero & Sidebar */
         .hero-container {
-            text-align: center; 
-            padding: 50px 20px;
+            text-align: center; padding: 50px 20px;
             background: linear-gradient(135deg, #065F46 0%, #1E40AF 100%);
-            color: white; 
-            margin: -6rem -4rem 30px -4rem;
+            color: white; margin: -7rem -4rem 30px -4rem;
+            border-bottom: 5px solid #10B981;
         }
+        [data-testid="stSidebar"] { background-color: #0F172A !important; border-right: 3px solid #10B981 !important; }
+        [data-testid="stSidebar"] * { color: white !important; }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. TOP NAVIGATION (Profile Icon) ---
+# --- 3. TOP NAVIGATION ---
 st.markdown(f"""
-    <div class="user-mgmt-container">
-        <span style="color:white; margin-right:10px; font-weight:600;">Debasish</span>
-        <img src="https://www.w3schools.com/howto/img_avatar.png" class="profile-pic">
+    <div style="position: fixed; top: 12px; right: 12px; z-index: 1000000; display: flex; align-items: center; background: white; padding: 5px 15px; border-radius: 30px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">
+        <span style="color: #0F172A; margin-right:8px; font-weight:700;">Debasish</span>
+        <img src="https://www.w3schools.com/howto/img_avatar.png" style="width: 35px; border-radius: 50%; border: 2px solid #10B981;">
     </div>
     """, unsafe_allow_html=True)
 
 # --- 4. SIDEBAR ---
 with st.sidebar:
-    st.markdown('<br>', unsafe_allow_html=True)
-    # Your Logo Placeholder
-    st.image("https://www.w3schools.com/howto/img_avatar.png", width=80) 
-    st.markdown('<h2 style="color: #10B981; margin-bottom:0;">Accounting Expert</h2>', unsafe_allow_html=True)
-    st.caption("tallytools.in")
+    st.markdown("<br><br>", unsafe_allow_html=True)
+    st.image("https://www.w3schools.com/howto/img_avatar.png", width=90) 
+    st.markdown('<h2 style="color: #10B981;">Accounting Expert</h2>', unsafe_allow_html=True)
+    with st.expander("👤 Account", expanded=True):
+        st.write("Debasish | Pro Tier")
     st.divider()
 
-    # User Section
-    with st.expander("👤 User Account", expanded=True):
-        st.write("**Account:** Debasish")
-        st.write("**Tier:** Professional")
-        st.button("Update Profile")
-
-    # Help Section
-    with st.expander("❓ Help & Support", expanded=False):
-        st.write("WhatsApp: +91 9002043666")
-        st.write("Email: support@tallytools.in")
-
-    st.divider()
-    st.write("v1.0.2-Stable")
-
-# --- 5. DATA LOGIC ---
+# --- 5. CORE LOGIC (The "Core Things") ---
 def clean_currency(value):
+    """Cleans currency strings into floats."""
     if pd.isna(value) or value == '': return 0.0
     val = re.sub(r'[^\d.]', '', str(value))
     try: return float(val)
     except: return 0.0
 
 def smart_normalize(df):
+    """Detects headers and maps columns to Tally standards."""
     if df is None or df.empty: return pd.DataFrame()
     df = df.dropna(how='all', axis=0).reset_index(drop=True)
     header_idx = None
@@ -143,6 +82,7 @@ def smart_normalize(df):
         df.columns = df.iloc[header_idx]
         df = df[header_idx + 1:].reset_index(drop=True)
     df.columns = df.columns.astype(str).str.strip().str.lower()
+    
     new_df = pd.DataFrame()
     col_map = {'Date':['date','txn'],'Narration':['narration','particular'],'Debit':['debit','dr'],'Credit':['credit','cr']}
     for target, aliases in col_map.items():
@@ -150,25 +90,29 @@ def smart_normalize(df):
         new_df[target] = df[found] if found else (0.0 if target in ['Debit', 'Credit'] else "")
     return new_df
 
-# --- 6. MAIN DASHBOARD ---
-st.markdown('<div class="hero-container"><h1 style="font-size: 2.8rem;">Accounting Expert</h1><p>Convert Excel to Tally XML Instantly</p></div>', unsafe_allow_html=True)
+# --- 6. MAIN CONTENT ---
+st.markdown('<div class="hero-container"><h1>Accounting Expert</h1><p>Core XML Engine Active</p></div>', unsafe_allow_html=True)
 
-layout_col1, layout_col2 = st.columns([1, 1], gap="large")
-
-with layout_col1:
-    st.subheader("🛠️ 1. Settings")
+col1, col2 = st.columns(2, gap="large")
+with col1:
+    st.subheader("🛠️ Step 1")
     with st.container(border=True):
-        master = st.file_uploader("Upload Tally Master (HTML)", type=['html'])
-        bank_led = st.selectbox("Select Bank Ledger", ["Suspense A/c", "HDFC Bank", "SBI Bank"])
+        master = st.file_uploader("Upload Tally Master", type=['html'])
+        bank_led = st.selectbox("Bank Ledger", ["Suspense A/c", "HDFC Bank"])
 
-with layout_col2:
-    st.subheader("📂 2. Conversion")
+with col2:
+    st.subheader("📂 Step 2")
     with st.container(border=True):
-        stmt_file = st.file_uploader("Upload Statement (PDF/Excel)", type=['pdf', 'xlsx'])
-        if stmt_file:
-            st.success(f"Ready to convert: {stmt_file.name}")
-            if st.button("🚀 GENERATE TALLY XML"):
-                st.balloons()
-                st.download_button("⬇️ Download XML", "Converted Content", "tally_import.xml")
+        stmt = st.file_uploader("Upload Statement", type=['xlsx', 'pdf'])
+        if stmt:
+            # Running the core normalization logic
+            df_raw = pd.read_excel(stmt) if stmt.name.endswith('xlsx') else None
+            if df_raw is not None:
+                df_clean = smart_normalize(df_raw)
+                st.success("Core Engine: Data Normalized!")
+                st.dataframe(df_clean.head(3)) # Preview of the core work
+            
+            if st.button("🚀 GENERATE XML"):
+                st.download_button("⬇️ Download", "XML_CONTENT_HERE", "tally.xml")
 
-st.markdown("<br><hr><center>© 2026 TallyTools.in | Berhampore, WB</center>", unsafe_allow_html=True)
+st.markdown("<br><hr><center>tallytools.in</center>", unsafe_allow_html=True)
