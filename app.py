@@ -10,120 +10,157 @@ st.set_page_config(
     initial_sidebar_state="collapsed" 
 )
 
-# --- 2. THE ULTIMATE PROFESSIONAL CSS ---
+# --- 2. THE ACCOUNTING COACH "CLONE" ENGINE ---
 st.markdown("""
     <style>
-        /* Global Reset */
-        .stApp { background-color: #FFFFFF; }
+        /* 1. Navbar: Dark Teal/Blue thin strip */
         header, .stDeployButton, footer { visibility: hidden !important; display: none !important; }
-
-        /* 🟢 CLEAN HEADER BAR (Centered Text) */
-        .nav-bar {
-            position: fixed; top: 0; left: 0; width: 100%; height: 60px;
-            background-color: #0F172A; display: flex; align-items: center;
-            justify-content: center; z-index: 1000001;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        .nav-logo-text { color: white; font-weight: 800; font-size: 22px; letter-spacing: 1px; }
         
-        /* HAMBURGER ICON STYLING */
+        .custom-nav {
+            background-color: #004b63;
+            height: 60px;
+            width: 100%;
+            position: fixed;
+            top: 0;
+            left: 0;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 15px;
+            z-index: 999999;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.2);
+        }
+        
+        /* Centered Logo in Nav */
+        .nav-logo {
+            color: white;
+            font-family: 'Serif', 'Times New Roman';
+            font-size: 24px;
+            font-weight: bold;
+            text-align: center;
+            flex-grow: 1;
+        }
+
+        /* 2. Hamburger override for left-side placement */
         [data-testid="stSidebarCollapsedControl"] {
             background-color: transparent !important;
-            top: 5px !important; left: 10px !important;
-            z-index: 1000002 !important;
+            top: 5px !important;
+            left: 5px !important;
+            z-index: 1000000 !important;
         }
-        [data-testid="stSidebarCollapsedControl"] svg { fill: white !important; width: 32px !important; height: 32px !important; }
+        [data-testid="stSidebarCollapsedControl"] svg { fill: white !important; width: 35px !important; }
 
-        /* 🔵 HERO SECTION (Dark Blue Gradient) */
+        /* 3. Hero Section: Direct Clone of the Blue/Teal Gradient */
         .hero-section {
-            background: linear-gradient(180deg, #0F172A 0%, #1E40AF 100%);
-            padding: 100px 20px 80px 20px; text-align: center; color: white;
+            background: radial-gradient(circle at center, #11819d 0%, #004b63 100%);
+            color: white;
+            text-align: center;
+            padding: 100px 20px 80px 20px;
             margin: -6rem -4rem 0 -4rem;
         }
-        .hero-section h1 { font-size: 2.8rem; font-weight: 800; margin-bottom: 15px; line-height: 1.2; }
-        .hero-section p { font-size: 1.1rem; opacity: 0.85; max-width: 600px; margin: 0 auto; }
-
-        /* ⚪ THE TOOL CONTAINER (Floating Card) */
-        .tool-card {
-            max-width: 1000px; margin: -50px auto 40px auto;
-            background: white; padding: 40px; border-radius: 12px;
-            box-shadow: 0 20px 40px rgba(0,0,0,0.12); border: 1px solid #F1F5F9;
+        .hero-section h1 {
+            font-size: 3.5rem;
+            font-weight: 700;
+            margin-bottom: 20px;
+            font-family: 'Serif', 'Times New Roman';
+        }
+        .hero-section p {
+            font-size: 1.3rem;
+            max-width: 700px;
+            margin: 0 auto 30px auto;
+            line-height: 1.5;
         }
 
-        /* SIDEBAR STYLING */
-        [data-testid="stSidebar"] { background-color: #0F172A !important; border-right: 3px solid #10B981 !important; }
-        [data-testid="stSidebar"] * { color: white !important; }
+        /* 4. White Section Below Hero */
+        .white-section {
+            background-color: white;
+            padding: 40px 20px;
+            margin: 0 -4rem;
+            text-align: center;
+        }
+
+        /* 5. Tool Container: Styled like their 'Choose a Topic' boxes */
+        .tool-box {
+            background-color: #f8fbfc;
+            border: 1px solid #e1e8ed;
+            border-radius: 4px;
+            padding: 25px;
+            margin-top: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+        }
         
-        /* Modern Section Headers */
-        .section-title { 
-            color: #1E293B; font-size: 20px; font-weight: 700; 
-            margin-bottom: 25px; border-bottom: 2px solid #10B981; 
-            display: inline-block; padding-bottom: 5px;
+        /* Main Button: White background with blue border like 'Course Outline' */
+        .stButton>button {
+            background-color: white !important;
+            color: #004b63 !important;
+            border: 2px solid #004b63 !important;
+            font-weight: bold !important;
+            border-radius: 0 !important;
+            height: 50px !important;
+            text-transform: uppercase;
         }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. TOP NAVIGATION ---
+# --- 3. CUSTOM NAVBAR ---
 st.markdown("""
-    <div class="nav-bar">
-        <div class="nav-logo-text">ACCOUNTING EXPERT</div>
+    <div class="custom-nav">
+        <div style="width: 40px;"></div> <div class="nav-logo">AccountingExpert</div>
+        <div style="color:white; font-size: 20px;">🔍</div>
     </div>
-    """, unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
-# --- 4. SIDEBAR ---
-with st.sidebar:
-    st.markdown("<br><br>", unsafe_allow_html=True)
-    st.image("https://www.w3schools.com/howto/img_avatar.png", width=70) # Replace with your logo
-    st.markdown("### Navigation")
-    st.divider()
-    st.button("🏠 Homepage")
-    st.button("⚙️ Tool Settings")
-    st.button("👤 My Account")
-    st.divider()
-    st.write("Professional Tally Solutions")
-
-# --- 5. THE HERO SECTION ---
+# --- 4. HERO SECTION ---
 st.markdown("""
     <div class="hero-section">
-        <img src="https://www.w3schools.com/howto/img_avatar.png" style="width: 90px; margin-bottom: 25px;">
-        <h1>Learn Accounting for Free</h1>
-        <p>Professional Excel to Tally XML conversion tool. Perfect for Bookkeepers, Accountants, and Small Businesses.</p>
+        <h1>Convert Excel to Tally for Free</h1>
+        <p>Perfect for Employees, Bookkeepers, Students, Accountants, and Small Businesses.</p>
     </div>
-    """, unsafe_allow_html=True)
+""", unsafe_allow_html=True)
 
-# --- 6. THE FLOATING TOOL CARD ---
-st.markdown('<div class="tool-card">', unsafe_allow_html=True)
+# --- 5. TRUST LOGO BAR ---
+st.markdown("""
+    <div class="white-section">
+        <p style="color: #666; font-size: 14px; margin-bottom: 20px;">TRUSTED BY PROFESSIONALS IN WEST BENGAL</p>
+        <div style="display: flex; justify-content: center; gap: 30px; opacity: 0.5; flex-wrap: wrap;">
+             <span style="font-weight: bold; font-size: 20px;">TALLY</span>
+             <span style="font-weight: bold; font-size: 20px;">MSME</span>
+             <span style="font-weight: bold; font-size: 20px;">GSTN</span>
+             <span style="font-weight: bold; font-size: 20px;">ICAI</span>
+        </div>
+    </div>
+""", unsafe_allow_html=True)
 
+# --- 6. THE CONVERSION TOOL (White background section) ---
+st.markdown("### Choose Your Action Below")
 col1, col2 = st.columns(2, gap="large")
 
 with col1:
-    st.markdown('<div class="section-title">🛠️ 1. Settings</div>', unsafe_allow_html=True)
-    st.file_uploader("Upload Tally Master (HTML)", type=['html'], help="Upload your master file to sync ledgers.")
-    st.selectbox("Bank Ledger", ["Suspense A/c", "HDFC Bank", "SBI Bank", "ICICI Bank"])
+    st.markdown('<div class="tool-box">', unsafe_allow_html=True)
+    st.markdown("#### 🛠️ 1. Settings")
+    st.file_uploader("Upload Tally Master (HTML)", type=['html'])
+    st.selectbox("Select Bank Ledger", ["Suspense A/c", "HDFC Bank", "SBI"])
+    st.markdown('</div>', unsafe_allow_html=True)
 
 with col2:
-    st.markdown('<div class="section-title">📂 2. Conversion</div>', unsafe_allow_html=True)
-    st.file_uploader("Upload Bank Statement", type=['pdf', 'xlsx'])
-    st.selectbox("Default Party", ["Suspense A/c", "Cash", "Sales"])
+    st.markdown('<div class="tool-box">', unsafe_allow_html=True)
+    st.markdown("#### 📂 2. Conversion")
+    st.file_uploader("Upload Statement", type=['pdf', 'xlsx'])
+    st.selectbox("Default Party Name", ["Suspense A/c", "Cash"])
+    st.markdown('</div>', unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
 if st.button("🚀 GENERATE XML FILE", use_container_width=True):
-    st.balloons()
-    st.success("Conversion Complete! Use the button below to save your file.")
-    st.download_button("⬇️ DOWNLOAD TALLY XML", "Content", "tally_import.xml", use_container_width=True)
+    st.success("File Ready for Download")
 
-st.markdown('</div>', unsafe_allow_html=True)
+# --- 7. AUTHOR SECTION (Same as AccountingCoach) ---
+st.markdown("<hr>", unsafe_allow_html=True)
+c_pic, c_text = st.columns([1, 3])
+with c_pic:
+    st.image("https://www.w3schools.com/howto/img_avatar.png", width=150)
+with c_text:
+    st.markdown("### About the Author")
+    st.write("Debasish Biswas has been helping accountants automate their workflow for years. He is the sole developer of **tallytools.in**, designed to make manual entry a thing of the past.")
+    st.write("📍 Berhampore, WB | 📞 +91 9002043666")
 
-# --- 7. AUTHOR SECTION (Matching AccountingCoach) ---
-st.markdown("<br><br>", unsafe_allow_html=True)
-a_col1, a_col2 = st.columns([1, 2.5])
-
-with a_col1:
-    st.image("https://www.w3schools.com/howto/img_avatar.png", width=140) # Your photo
-
-with a_col2:
-    st.markdown("### About the Developer")
-    st.write("This tool was developed by **Debasish Biswas**, based in Berhampore, West Bengal. With a focus on accounting automation, this site helps professionals save hours of manual data entry by converting statements directly into Tally Prime format.")
-    st.markdown("**Contact:** +91 9002043666 | **Website:** tallytools.in")
-
-st.markdown("<br><hr><center>© 2026 Accounting Expert | Powered by TallyTools.in</center>", unsafe_allow_html=True)
+st.markdown("<br><br><center>© 2026 Accounting Expert | tallytools.in</center>", unsafe_allow_html=True)
