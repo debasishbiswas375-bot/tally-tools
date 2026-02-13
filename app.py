@@ -10,21 +10,21 @@ st.set_page_config(
     page_title="Accounting Expert", 
     page_icon="logo.png",
     layout="wide",
-    initial_sidebar_state="collapsed" 
+    initial_sidebar_state="expanded" 
 )
 
 # --- 2. THE "IRONCLAD" UI ENGINE ---
 st.markdown("""
     <style>
-        /* Hide all Streamlit default headers and footers */
-        header, footer, .stDeployButton { visibility: hidden !important; display: none !important; }
+        /* Hide Streamlit default headers */
+        header, .stDeployButton { visibility: hidden !important; display: none !important; }
         
-        /* 🟢 FLOATING SIDEBAR ICON (LEFT) */
+        /* 🟢 FLOATING SIDEBAR ICON (For Mobile) */
         [data-testid="stSidebarCollapsedControl"] {
             background: #10B981 !important;
             color: white !important;
-            width: 55px !important;
-            height: 55px !important;
+            width: 50px !important;
+            height: 50px !important;
             border-radius: 50% !important;
             top: 15px !important;
             left: 15px !important;
@@ -32,79 +32,100 @@ st.markdown("""
             align-items: center !important;
             justify-content: center !important;
             box-shadow: 0 4px 15px rgba(0,0,0,0.3) !important;
-            z-index: 99999999 !important; /* Extremely high priority */
+            z-index: 999999 !important;
             position: fixed !important;
-            border: 2px solid white !important;
         }
-        [data-testid="stSidebarCollapsedControl"] svg { fill: white !important; width: 30px !important; height: 30px !important; }
 
-        /* 👤 SILENT PROFILE ICON (TOP RIGHT) */
+        /* 👤 TOP RIGHT PROFILE */
         .user-mgmt-container {
             position: fixed; 
             top: 15px; 
             right: 15px; 
-            z-index: 99999999; 
+            z-index: 999999; 
             display: flex; 
-            flex-direction: column; 
-            align-items: flex-end;
+            align-items: center;
         }
         .profile-pic {
-            width: 55px; 
-            height: 55px; 
+            width: 45px; 
+            height: 45px; 
             border-radius: 50%;
             border: 2px solid #10B981; 
             background-color: white;
-            cursor: pointer; 
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            cursor: pointer;
             object-fit: cover;
         }
-        .user-dropdown {
-            display: none; 
-            width: 220px; 
-            background: white;
-            border-radius: 12px; 
-            box-shadow: 0 12px 30px rgba(0,0,0,0.3);
-            padding: 18px; 
-            margin-top: 10px; 
-            border: 1px solid #E2E8F0;
+
+        /* SIDEBAR STYLING */
+        [data-testid="stSidebar"] {
+            background-color: #0F172A !important;
+            border-right: 1px solid #1E293B;
         }
-        .user-mgmt-container:hover .user-dropdown { display: block; }
+        [data-testid="stSidebar"] * { color: white !important; }
         
-        .user-dropdown h4 { color: #0F172A; margin: 0; font-size: 16px; font-weight: 700; }
-        .user-dropdown p { color: #10B981; font-size: 13px; margin: 2px 0 15px 0; font-weight: 600; }
-        
-        .menu-item {
-            display: block; padding: 10px 0; color: #334155 !important;
-            font-size: 14px; text-decoration: none; border-bottom: 1px solid #F1F5F9;
-            cursor: pointer;
+        /* CUSTOM CLOSE "X" ICON */
+        .sidebar-close-text {
+            position: absolute;
+            top: -10px;
+            right: 10px;
+            font-size: 28px;
+            color: #10B981;
+            font-weight: bold;
+            pointer-events: none; /* Let the actual arrow handle the click */
         }
 
-        /* HERO & THEME */
+        /* HERO SECTION */
         .hero-container {
-            text-align: center; padding: 60px 20px;
+            text-align: center; 
+            padding: 50px 20px;
             background: linear-gradient(135deg, #065F46 0%, #1E40AF 100%);
-            color: white; margin: -6rem -4rem 30px -4rem;
+            color: white; 
+            margin: -6rem -4rem 30px -4rem;
         }
-        [data-testid="stSidebar"] { background-color: #0F172A !important; }
-        [data-testid="stSidebar"] * { color: white !important; }
+        
+        /* Buttons Styling */
+        .stButton>button {
+            background-color: #10B981 !important;
+            color: white !important;
+            border-radius: 8px !important;
+            border: none !important;
+            width: 100%;
+        }
     </style>
 """, unsafe_allow_html=True)
 
-# --- 3. INJECT CUSTOM UI ---
+# --- 3. TOP NAVIGATION (Profile Icon) ---
 st.markdown(f"""
     <div class="user-mgmt-container">
+        <span style="color:white; margin-right:10px; font-weight:600;">Debasish</span>
         <img src="https://www.w3schools.com/howto/img_avatar.png" class="profile-pic">
-        <div class="user-dropdown">
-            <h4>Debasish</h4>
-            <p>Professional Tier</p>
-            <div class="menu-item">🔑 Change Password</div>
-            <div class="menu-item">🖼️ Update Picture</div>
-            <div class="menu-item">⚡ Upgrade Tier</div>
-        </div>
     </div>
     """, unsafe_allow_html=True)
 
-# --- 4. DATA LOGIC ---
+# --- 4. SIDEBAR (With "X" and Minimize features) ---
+with st.sidebar:
+    # Visual "X" hint next to the real collapse button
+    st.markdown('<div class="sidebar-close-text">×</div>', unsafe_allow_html=True)
+    
+    st.markdown('<h2 style="color: #10B981; margin-bottom:0;">Accounting Expert</h2>', unsafe_allow_html=True)
+    st.caption("Professional Solutions")
+    st.divider()
+
+    # MINIMIZE OPTION: User Account Expander
+    with st.expander("👤 User Account", expanded=True):
+        st.write("**Account:** Debasish")
+        st.write("**Tier:** Professional")
+        st.button("Edit Profile")
+
+    # MINIMIZE OPTION: Help & Support
+    with st.expander("❓ Help & Support", expanded=False):
+        st.write("WhatsApp: +91 9002043666")
+        st.write("Email: support@tallytools.in")
+        st.write("Location: Berhampore, WB")
+
+    st.divider()
+    st.info("Tip: Use the '>>' arrow at the top to fully hide this menu.")
+
+# --- 5. DATA LOGIC (Cleaning & Conversion) ---
 def clean_currency(value):
     if pd.isna(value) or value == '': return 0.0
     val = re.sub(r'[^\d.]', '', str(value))
@@ -131,27 +152,28 @@ def smart_normalize(df):
         new_df[target] = df[found] if found else (0.0 if target in ['Debit', 'Credit'] else "")
     return new_df
 
-# --- 5. SIDEBAR ---
-with st.sidebar:
-    st.markdown('<h2 style="color: #10B981; text-align:center;">Accounting Expert</h2>', unsafe_allow_html=True)
-    st.write("User: **Debasish**")
-    st.write("WhatsApp: +91 9002043666")
-
 # --- 6. MAIN DASHBOARD ---
-st.markdown('<div class="hero-container"><h1 style="font-size: 2.5rem; font-weight: 800;">Accounting Expert</h1></div>', unsafe_allow_html=True)
+st.markdown('<div class="hero-container"><h1 style="font-size: 2.8rem;">Accounting Expert</h1><p>Excel to Tally XML Converter</p></div>', unsafe_allow_html=True)
 
-c1, c2 = st.columns([1, 1.5], gap="large")
-with c1:
-    with st.container():
-        st.markdown("### 🛠️ 1. Settings")
+layout_col1, layout_col2 = st.columns([1, 1], gap="large")
+
+with layout_col1:
+    st.subheader("🛠️ Step 1: Configuration")
+    with st.container(border=True):
         master = st.file_uploader("Upload Tally Master (HTML)", type=['html'])
-        bank_led = st.selectbox("Bank Ledger", ["Suspense A/c"])
+        bank_led = st.selectbox("Bank Ledger", ["Suspense A/c", "HDFC Bank", "SBI Bank"])
+        st.write("---")
+        st.checkbox("Auto-detect columns", value=True)
 
-with c2:
-    with st.container():
-        st.markdown("### 📂 2. Conversion")
-        stmt_file = st.file_uploader("Upload PDF or Excel", type=['pdf', 'xlsx'])
+with layout_col2:
+    st.subheader("📂 Step 2: Conversion")
+    with st.container(border=True):
+        stmt_file = st.file_uploader("Upload Bank Statement (PDF/Excel)", type=['pdf', 'xlsx'])
         if stmt_file:
-            st.success("File Received! Click Generate below.")
+            st.success(f"File '{stmt_file.name}' ready!")
             if st.button("🚀 GENERATE XML"):
-                st.download_button("⬇️ Download XML", "Dummy XML Content", "tally_import.xml")
+                # Placeholder for your XML logic
+                st.balloons()
+                st.download_button("⬇️ Download XML", "Converted XML Content", "tally_import.xml")
+
+st.markdown("<br><hr><center>Developed for debasish.biswas375 | TallyTools.in</center>", unsafe_allow_html=True)
