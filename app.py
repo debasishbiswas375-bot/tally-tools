@@ -10,30 +10,51 @@ st.set_page_config(
     page_title="Accounting Expert", 
     page_icon="logo.png",
     layout="wide",
-    initial_sidebar_state="expanded" 
+    initial_sidebar_state="collapsed" # Starts closed like a mobile app
 )
 
 # --- 2. THE "IRONCLAD" UI ENGINE ---
 st.markdown("""
     <style>
-        /* Hide Streamlit default headers */
+        /* Hide default Streamlit elements */
         header, .stDeployButton { visibility: hidden !important; display: none !important; }
         
-        /* 🟢 FLOATING SIDEBAR ICON (For Mobile) */
+        /* 🟢 THE 3-LINE HAMBURGER MENU (To Expand) */
         [data-testid="stSidebarCollapsedControl"] {
-            background: #10B981 !important;
-            color: white !important;
-            width: 50px !important;
-            height: 50px !important;
-            border-radius: 50% !important;
+            background-color: #10B981 !important;
+            border-radius: 8px !important;
+            width: 45px !important;
+            height: 45px !important;
             top: 15px !important;
             left: 15px !important;
             display: flex !important;
             align-items: center !important;
             justify-content: center !important;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.3) !important;
             z-index: 999999 !important;
-            position: fixed !important;
+            border: 1px solid rgba(255,255,255,0.2) !important;
+        }
+
+        /* Hide the default Streamlit >> arrow */
+        [data-testid="stSidebarCollapsedControl"] svg { display: none !important; }
+
+        /* Draw the 3 lines using CSS */
+        [data-testid="stSidebarCollapsedControl"]::before {
+            content: "";
+            width: 20px;
+            height: 2px;
+            background: white;
+            position: absolute;
+            box-shadow: 0 7px 0 white, 0 -7px 0 white;
+        }
+
+        /* ❌ THE "X" CLOSE BUTTON (Inside Sidebar) */
+        /* This targets the Streamlit collapse button when the sidebar is open */
+        [data-testid="stSidebar"] button[kind="headerNoSpacing"] {
+            background-color: #10B981 !important;
+            color: white !important;
+            border-radius: 50% !important;
+            top: 10px !important;
+            right: 10px !important;
         }
 
         /* 👤 TOP RIGHT PROFILE */
@@ -51,27 +72,14 @@ st.markdown("""
             border-radius: 50%;
             border: 2px solid #10B981; 
             background-color: white;
-            cursor: pointer;
-            object-fit: cover;
         }
 
         /* SIDEBAR STYLING */
         [data-testid="stSidebar"] {
             background-color: #0F172A !important;
-            border-right: 1px solid #1E293B;
+            border-right: 2px solid #10B981;
         }
         [data-testid="stSidebar"] * { color: white !important; }
-        
-        /* CUSTOM CLOSE "X" ICON */
-        .sidebar-close-text {
-            position: absolute;
-            top: -10px;
-            right: 10px;
-            font-size: 28px;
-            color: #10B981;
-            font-weight: bold;
-            pointer-events: none; /* Let the actual arrow handle the click */
-        }
 
         /* HERO SECTION */
         .hero-container {
@@ -80,15 +88,6 @@ st.markdown("""
             background: linear-gradient(135deg, #065F46 0%, #1E40AF 100%);
             color: white; 
             margin: -6rem -4rem 30px -4rem;
-        }
-        
-        /* Buttons Styling */
-        .stButton>button {
-            background-color: #10B981 !important;
-            color: white !important;
-            border-radius: 8px !important;
-            border: none !important;
-            width: 100%;
         }
     </style>
 """, unsafe_allow_html=True)
@@ -101,31 +100,30 @@ st.markdown(f"""
     </div>
     """, unsafe_allow_html=True)
 
-# --- 4. SIDEBAR (With "X" and Minimize features) ---
+# --- 4. SIDEBAR ---
 with st.sidebar:
-    # Visual "X" hint next to the real collapse button
-    st.markdown('<div class="sidebar-close-text">×</div>', unsafe_allow_html=True)
-    
+    st.markdown('<br>', unsafe_allow_html=True)
+    # Your Logo Placeholder
+    st.image("https://www.w3schools.com/howto/img_avatar.png", width=80) 
     st.markdown('<h2 style="color: #10B981; margin-bottom:0;">Accounting Expert</h2>', unsafe_allow_html=True)
-    st.caption("Professional Solutions")
+    st.caption("tallytools.in")
     st.divider()
 
-    # MINIMIZE OPTION: User Account Expander
+    # User Section
     with st.expander("👤 User Account", expanded=True):
         st.write("**Account:** Debasish")
         st.write("**Tier:** Professional")
-        st.button("Edit Profile")
+        st.button("Update Profile")
 
-    # MINIMIZE OPTION: Help & Support
+    # Help Section
     with st.expander("❓ Help & Support", expanded=False):
         st.write("WhatsApp: +91 9002043666")
         st.write("Email: support@tallytools.in")
-        st.write("Location: Berhampore, WB")
 
     st.divider()
-    st.info("Tip: Use the '>>' arrow at the top to fully hide this menu.")
+    st.write("v1.0.2-Stable")
 
-# --- 5. DATA LOGIC (Cleaning & Conversion) ---
+# --- 5. DATA LOGIC ---
 def clean_currency(value):
     if pd.isna(value) or value == '': return 0.0
     val = re.sub(r'[^\d.]', '', str(value))
@@ -153,27 +151,24 @@ def smart_normalize(df):
     return new_df
 
 # --- 6. MAIN DASHBOARD ---
-st.markdown('<div class="hero-container"><h1 style="font-size: 2.8rem;">Accounting Expert</h1><p>Excel to Tally XML Converter</p></div>', unsafe_allow_html=True)
+st.markdown('<div class="hero-container"><h1 style="font-size: 2.8rem;">Accounting Expert</h1><p>Convert Excel to Tally XML Instantly</p></div>', unsafe_allow_html=True)
 
 layout_col1, layout_col2 = st.columns([1, 1], gap="large")
 
 with layout_col1:
-    st.subheader("🛠️ Step 1: Configuration")
+    st.subheader("🛠️ 1. Settings")
     with st.container(border=True):
         master = st.file_uploader("Upload Tally Master (HTML)", type=['html'])
-        bank_led = st.selectbox("Bank Ledger", ["Suspense A/c", "HDFC Bank", "SBI Bank"])
-        st.write("---")
-        st.checkbox("Auto-detect columns", value=True)
+        bank_led = st.selectbox("Select Bank Ledger", ["Suspense A/c", "HDFC Bank", "SBI Bank"])
 
 with layout_col2:
-    st.subheader("📂 Step 2: Conversion")
+    st.subheader("📂 2. Conversion")
     with st.container(border=True):
-        stmt_file = st.file_uploader("Upload Bank Statement (PDF/Excel)", type=['pdf', 'xlsx'])
+        stmt_file = st.file_uploader("Upload Statement (PDF/Excel)", type=['pdf', 'xlsx'])
         if stmt_file:
-            st.success(f"File '{stmt_file.name}' ready!")
-            if st.button("🚀 GENERATE XML"):
-                # Placeholder for your XML logic
+            st.success(f"Ready to convert: {stmt_file.name}")
+            if st.button("🚀 GENERATE TALLY XML"):
                 st.balloons()
-                st.download_button("⬇️ Download XML", "Converted XML Content", "tally_import.xml")
+                st.download_button("⬇️ Download XML", "Converted Content", "tally_import.xml")
 
-st.markdown("<br><hr><center>Developed for debasish.biswas375 | TallyTools.in</center>", unsafe_allow_html=True)
+st.markdown("<br><hr><center>© 2026 TallyTools.in | Berhampore, WB</center>", unsafe_allow_html=True)
